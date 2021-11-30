@@ -318,22 +318,22 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 
 	case sdrplay_api_PowerOverloadChange:
 
-		//if (tuner == sdrplay_api_Tuner_A && params->powerOverloadParams.powerOverloadChangeType ==
-		//	sdrplay_api_Overload_Detected)
-		//{
-		//	md->overloaded_A = true;
-		//	int gr = md->deviceParams->rxChannelA->tunerParams.gain.gRdB;
-		//	int lnastate = md->deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-		//	cout << "Overload detected on tuner A with lnastate " << lnastate << " and grdB: " << gr << endl;
-		//	md->increaseLNAstate_A(2);
-		//}
-		//else if (tuner == sdrplay_api_Tuner_A && params->powerOverloadParams.powerOverloadChangeType ==
-		//	sdrplay_api_Overload_Corrected)
-		//{
-		//	md->overloaded_A = false;
-		//	cout << "Overload corrected on tuner A" << endl;
-		//	//md->deviceParams->rxChannelB->tunerParams.gain.gRdB +=1;
-		//}
+		if (tuner == sdrplay_api_Tuner_A && params->powerOverloadParams.powerOverloadChangeType ==
+			sdrplay_api_Overload_Detected)
+		{
+			md->overloaded_A = true;
+			int gr = md->deviceParams->rxChannelA->tunerParams.gain.gRdB;
+			int lnastate = md->deviceParams->rxChannelA->tunerParams.gain.LNAstate;
+			cout << "Overload detected on tuner A with lnastate " << lnastate << " and grdB: " << gr << endl;
+			//md->increaseLNAstate_A(2);
+		}
+		else if (tuner == sdrplay_api_Tuner_A && params->powerOverloadParams.powerOverloadChangeType ==
+			sdrplay_api_Overload_Corrected)
+		{
+			md->overloaded_A = false;
+			cout << "Overload corrected on tuner A" << endl;
+			//md->deviceParams->rxChannelB->tunerParams.gain.gRdB +=1;
+		}
 		//else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
 		//	sdrplay_api_Overload_Detected)
 		//{
@@ -350,9 +350,9 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 		//	//md->deviceParams->rxChannelB->tunerParams.gain.gRdB +=1;
 		//}
 
-		//// Send update message to acknowledge power overload message received
-		//sdrplay_api_Update(md->pDevice->dev, tuner, sdrplay_api_Update_Ctrl_OverloadMsgAck,
-		//	sdrplay_api_Update_Ext1_None);
+		// Send update message to acknowledge power overload message received
+		sdrplay_api_Update(md->pDevice->dev, tuner, sdrplay_api_Update_Ctrl_OverloadMsgAck,
+			sdrplay_api_Update_Ext1_None);
 		break;
 
 	case sdrplay_api_RspDuoModeChange:
@@ -561,119 +561,128 @@ sdrplay_api_ErrT sdrplay_device::setFrequency(int valueHz)
 sdrplay_api_ErrT sdrplay_device::setGain(int value)
 {
 	err = sdrplay_api_Success;
-	//if (curGainValue == 0)
-	//	return err;
-	if (AGC_A == true)
-	{
-		int curGainValue = (int)(getGainValues() + 0.5f);
-		byte lnastate;
-		if (value > curGainValue)
-		{
-			// decrease lna state
-			lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-			LNAstate = lnastate - 1;
-			cout << "Requested gain of " << value << " set, GR: " << value << " , LNAState: " << LNAstate << endl;
-			deviceParams->rxChannelA->tunerParams.gain.LNAstate = (lnastate - 1) > 0 ? lnastate - 1 : 0;
-		}
-		else if (value < curGainValue)
-		{
-			// increase lna state
-			lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-			LNAstate = lnastate + 1;
-			cout << "Requested gain of " << value << " set, GR: " << value << " , LNAState: " << (int)lnastate << endl;
-			deviceParams->rxChannelA->tunerParams.gain.LNAstate = (lnastate - 1) < 7 ? lnastate + 1 : 7;
-		}
-		else // value didn't change
-			return err;
-		curGainValue = value;
-		LNAstate = lnastate;
 
-		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-			sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+	//if (AGC_A == true)
+	//{
+	//	int curGainValue = (int)(getGainValues() + 0.5f);
+	//	byte lnastate;
+	//	if (value > curGainValue)
+	//	{
+	//		// decrease lna state
+	//		lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
+	//		LNAstate = lnastate - 1;
+	//		if (VERBOSE)
+	//			cout << "Requested gain of " << value << " set, GR: " << value << " , LNAState: " << LNAstate << endl;
+	//		deviceParams->rxChannelA->tunerParams.gain.LNAstate = (lnastate - 1) > 0 ? lnastate - 1 : 0;
+	//	}
+	//	else if (value < curGainValue)
+	//	{
+	//		// increase lna state
+	//		lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
+	//		LNAstate = lnastate + 1;
+	//		if (VERBOSE)
+	//			cout << "Requested gain of " << value << " set, GR: " << value << " , LNAState: " << (int)lnastate << endl;
+	//		deviceParams->rxChannelA->tunerParams.gain.LNAstate = (lnastate - 1) < 7 ? lnastate + 1 : 7;
+	//	}
+	//	else // value didn't change
+	//		return err;
+	//	curGainValue = value;
+	//	LNAstate = lnastate;
 
-		cout << "\nsdrplay_api_Update_Tuner_GainReduction returned with: " << err << endl;
-		if (err != sdrplay_api_Success)
-		{
-			cout << "*** Error on Gain Reduction setting: " << sdrplay_api_GetErrorString(err) << endl;
-			cout << "Requested gain was: " << value << /*" , GR: " << gainReduction <<*/  " , lnastate: " << LNAstate << endl;
-		}
-		else
-		{
-			LNAstate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-			int gr = deviceParams->rxChannelA->tunerParams.gain.gRdB;
-			cout << "Result was GR: " << gr <<" , LNAState: " << LNAstate << endl;
-		}
-	}
-	else if (AGC_A == false)
+	//	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+	//		sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+
+	//	cout << "\nsdrplay_api_Update_Tuner_GainReduction returned with: " << err << endl;
+	//	if (err != sdrplay_api_Success)
+	//	{
+	//		cout << "*** Error on Gain Reduction setting: " << sdrplay_api_GetErrorString(err) << endl;
+	//		cout << "Requested gain was: " << value << /*" , GR: " << gainReduction <<*/  " , lnastate: " << LNAstate << endl;
+	//	}
+	//	else
+	//	{
+	//		LNAstate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
+	//		int gr = deviceParams->rxChannelA->tunerParams.gain.gRdB;
+	//		cout << "Result was GR: " << gr <<" , LNAState: " << LNAstate << endl;
+	//	}
+	//}
+	if (AGC_A == false)
 	{
 		sdrplay_api_ErrT err;
-		//sdrplay_api_SetGrModeT grMode;
+		//cout << " Gain value requested: "<< value<< endl;
 
-		//if (flatGr)
-		//{
-		//	grMode = sdrplay_api_USE_SET_GR;
-		//	gainReduction = gainConfiguration::GAIN_STEPS - value;
-		//	err = sdrplay_api_SetGr(gainReduction, 1, 0);
-		//}
-		//else
-		{
-			//cout << " Gain value requested: "<< value<< endl;
+		int lnastate = 0;
+		int gr = 0;
 
-			int lnastate = 0;
-			int gr = 0;
+		// map GAIN_STEPS into 20 .. 59 dB
+		double steps = (double)gainConfiguration::GAIN_STEPS;
+		double grMax = 59.0;
+		double grMin = 20.0;
+		double grunit = (grMax - grMin) / steps;
+		double gred = (steps - value); // value is max gain, NOT gr
+		double dgr = grMin + gred * grunit;
+		gr = gainReduction = (int)(dgr + 0.5);
 
-			if (RSPGainValuesFromRequestedGain(value, rxType, lnastate, gr))
-			{
-				if (gr < 20)
-					gr = 20;
-				if (gr > 59)
-					gr = 59;
-				gainReduction = gr;
-				LNAstate = lnastate;
-				deviceParams->rxChannelA->tunerParams.gain.LNAstate = (lnastate - 1) < 7 ? lnastate + 1 : 7;
-				if (lnastate != (int(deviceParams->rxChannelA->tunerParams.gain.LNAstate)))
-				{
-					err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-						sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-					if (VERBOSE)
-					{
-						cout << "Set Lnastate returned " << err << " with requested value: " << (int)(deviceParams->rxChannelA->tunerParams.gain.LNAstate) << endl;
-						cout << "LNA State: " << lnastate << endl;
-					}
-				}
-
-				deviceParams->rxChannelA->tunerParams.gain.gRdB = gainReduction;
-				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-					sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-
-				if (VERBOSE)
-				{
-					cout << "Set Gain reduction returned " << err << " with requested value: " << gainReduction << endl;
-					cout << "Gr value: " << gr << endl;
-				}
-				return err;
-			}
-			else
-			{
-				cout << "RSPGainValuesFromRequestedGain FAILED for the requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
-				return (sdrplay_api_ErrT)-1;
-			}
-		}
-
+		deviceParams->rxChannelA->tunerParams.gain.gRdB = gainReduction;
+		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+			sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
 		if (VERBOSE)
-			cout << "\Set Gr and LNA state returned with: " << err << endl;
-
-		if (err != sdrplay_api_Success)
 		{
-			cout << "Set Gr and LNA state  FAILED with requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
+			cout << "Requested Gain of " << value << "   resulted in " << gr << " dB gain reduction." << endl;
 		}
-		else if (VERBOSE)
-			cout << "Set Gr and LNA state  succeeded with requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
-
 		return err;
 	}
 
-	return err;
+	//	if (RSPGainValuesFromRequestedGain(value, rxType, lnastate, gr))
+	//	{
+	//		if (gr < 20)
+	//			gr = 20;
+	//		if (gr > 59)
+	//			gr = 59;
+	//		gainReduction = gr;
+	//		LNAstate = lnastate;
+	//		deviceParams->rxChannelA->tunerParams.gain.LNAstate = lnastate;
+	//		if (lnastate != (int(deviceParams->rxChannelA->tunerParams.gain.LNAstate)))
+	//		{
+	//			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+	//				sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+	//			if (VERBOSE)
+	//			{
+	//				cout << "Set Lnastate returned " << err << " with requested value: " << (int)(deviceParams->rxChannelA->tunerParams.gain.LNAstate) << endl;
+	//				cout << "LNA State: " << lnastate << endl;
+	//			}
+	//		}
+
+	//		deviceParams->rxChannelA->tunerParams.gain.gRdB = gainReduction;
+	//		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+	//			sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+
+	//		if (VERBOSE)
+	//		{
+	//			cout << "Set Gain reduction returned " << err << " with requested value: " << gainReduction << endl;
+	//			cout << "Gr value: " << gr << endl;
+	//		}
+	//		return err;
+	//	}
+	//	else
+	//	{
+	//		cout << "RSPGainValuesFromRequestedGain FAILED for the requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
+	//		return (sdrplay_api_ErrT)-1;
+	//	}
+
+	//	if (VERBOSE)
+	//		cout << "\Set Gr and LNA state returned with: " << err << endl;
+
+	//	if (err != sdrplay_api_Success)
+	//	{
+	//		cout << "Set Gr and LNA state  FAILED with requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
+	//	}
+	//	else if (VERBOSE)
+	//		cout << "Set Gr and LNA state  succeeded with requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
+
+	//	return err;
+	//}
+
+	//return err;
 
 	//if (overloaded_A)
 	//{
@@ -736,9 +745,12 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 		AGC_A = true;
 		// enable AGC with a setPoint of -15dBfs //optimum for DAB
 		deviceParams->rxChannelA->ctrlParams.agc.setPoint_dBfs = -15;// -60;
-		deviceParams->rxChannelA->ctrlParams.agc.enable = sdrplay_api_AGC_50HZ;
+		deviceParams->rxChannelA->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
 		cout << "\nsdrplay_api_AgcControl 50Hz, " << agcPoint_dBfs << " dBfs returned with: " << err << endl;
 	}
+	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+		sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+
 	if (err != sdrplay_api_Success)
 	{
 		cout << "SetAGC failed." << endl;
@@ -755,9 +767,11 @@ sdrplay_api_ErrT sdrplay_device::increaseLNAstate_A(int step)
 		lnastate += step;
 
 	deviceParams->rxChannelA->tunerParams.gain.LNAstate = (byte)lnastate;
+
 	sdrplay_api_ErrT err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
 	lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
+
 	if (VERBOSE)
 		cout << "New lnastate returned with " << err << " and new lnastate " << lnastate << endl;
 	return err;
@@ -919,7 +933,9 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 				sdrplay_api_Update_Rsp2_AntennaControl, sdrplay_api_Update_Ext1_None);
 			break;
 		case RSPduo:
-			err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_1);// , sdrplay_api_RspDuo_AMPORT_2);
+			//for the next line to work, the ChannelB must be prepared
+			//err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_1);// , sdrplay_api_RspDuo_AMPORT_2);
+			err = sdrplay_api_InvalidParam;
 			break;
 		default:
 			break;
