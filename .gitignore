@@ -70,3 +70,6 @@
 /RSP3_TCP.v12.suo
 /RSP3_TCP.sdf
 /.vs/RSP3_TCP/v16/ipch/AutoPCH/96041241db783542/CONTROLTHREAD.ipch
+/.vs/RSP3_TCP/v16/ipch/AutoPCH/8ba9e6b1eb0a7c6/RECEIVETHREAD.ipch
+/.vs/RSP3_TCP/v16/ipch/AutoPCH/65daed1b3c14181b/SDRGAINTABLE.ipch
+*.ipch

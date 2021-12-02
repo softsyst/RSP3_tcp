@@ -161,10 +161,10 @@ void *ctrl_thread_fn(void *arg)
 			total_gain = 123;
 			result = 0;
 			
-			float gain = dev->getGainValues();
+			float gain = dev->getGainValues()->curr;
 			if (gain > 0)
 				total_gain = (int)(gain * 10.0f);
-			//result = rtlsdr_get_tuner_i2c_register(dev, reg_values, &len, &total_gain);
+
 			memset(txbuf, 0, TX_BUF_LEN);
 			if (result)
 				goto sleep;

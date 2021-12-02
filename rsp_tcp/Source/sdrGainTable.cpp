@@ -28,6 +28,8 @@
 // 1st dim: Band, 2nd dim gr value for LNAstate
 matrix<int> gainTables[4];
 
+//int noOfLNAStatesForDevice[4] =  {4, 10, 9, 10};
+
 void gainConfiguration::createGainConfigTables()
 {
 	//RSP1
@@ -279,6 +281,11 @@ void gainConfiguration::createGainConfigTables()
 
  gainConfiguration::gainConfiguration(t_freqBand band) : myBand((int)band)
  {
+ }
+
+ bool gainConfiguration::IsGrInvalid(int rxType, int lnastate, int band)
+ {
+	 return gainTables[rxType][lnastate][band] == grInvalid;
  }
 
 

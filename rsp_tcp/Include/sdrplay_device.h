@@ -75,18 +75,6 @@ typedef struct
 ctrl_thread_data_t;
 void *ctrl_thread_fn(void *arg);
 
-struct selectedTuner_t
-{
-	sdrplay_api_StreamCallback_t streamCallback;
-	sdrplay_api_RxChannelParamsT* channel;
-	bool overloaded;
-	selectedTuner_t(int i)
-	{
-	}
-};
-
-
-
 
 class sdrplay_device
 {
@@ -101,17 +89,18 @@ private:
 	sdrplay_api_DeviceT* pDevice;
 
 	friend void* receive(void* p);
-	friend void streamACallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
-		unsigned int numSamples, unsigned int reset, void *cbContext);
+	//friend void streamACallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
+	//	unsigned int numSamples, unsigned int reset, void *cbContext);
 
-	friend void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
+	//friend void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
+	//	unsigned int numSamples, unsigned int reset, void *cbContext);
+
+	friend void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 		unsigned int numSamples, unsigned int reset, void *cbContext);
 
 	friend void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 		sdrplay_api_EventParamsT *params, void *cbContext);
 
-	sdrplay_api_ErrT increaseLNAstate_A(int step);
-	sdrplay_api_ErrT createChannels();
 
 public:
 	sdrplay_api_DeviceT* getDevice()
@@ -126,7 +115,7 @@ public:
 	void start(SOCKET client);
 	void stop();
 	void createCtrlThread(const char* addr, int port);
-	float getGainValues();
+	sdrplay_api_GainValuesT* getGainValues();
 
 	pthread_mutex_t mutex_rxThreadStarted;
 	pthread_cond_t started_cond = PTHREAD_COND_INITIALIZER;
@@ -134,6 +123,11 @@ public:
 	pthread_t* thrdCtrl;
 	ctrl_thread_data_t ctrlThreadData;
 	bool ctrlThreadExitFlag = false;
+
+	/// <summary>
+	/// Current values, to be sent to the host
+	/// </summary>
+	sdrplay_api_GainValuesT GainValues;
 
 	/// <summary>
 	/// API: Device Enumeration Structure
@@ -160,31 +154,23 @@ public:
 
 	bool Initialized = false;
 
-	selectedTuner_t* tuners[MAX_TUNERS];
-
 private:
 
 	const int c_welcomeMessageLength = 100;
 	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen);
+	sdrplay_api_ErrT createChannels();
 	sdrplay_api_ErrT setFrequency(int valueHz);
 	sdrplay_api_ErrT setFrequencyCorrection(int value);
 	sdrplay_api_ErrT setFrequencyCorrection100(int value);
 	sdrplay_api_ErrT setBiasT(int value);
 	sdrplay_api_ErrT setAntenna(int value);
+	sdrplay_api_ErrT setLNAState(int value);
 	sdrplay_api_ErrT setAGC(bool on);
 	sdrplay_api_ErrT setGain(int value);
 	sdrplay_api_ErrT setSamplingRate(int requestedSrHz);
-	sdrplay_api_ErrT reinit_Frequency(int valueHz);
-	sdrplay_api_ErrT stream_InitForSamplingRate(int sampleConfigsTableIndex);
-	//sdrplay_api_ErrT sdrplay_device::stream_InitForSamplingRate(
-	//	sdrplay_api_Bw_MHzT bandwidth,
-	//	int reqSamplingRateHz,
-	//	int deviceSamplingRateHz,
-	//	unsigned int decimationFactor,
-	//	unsigned int doDecimation
-	//);
-		sdrplay_api_ErrT stream_Uninit();
+	sdrplay_api_ErrT stream_Uninit();
 	bool RSPGainValuesFromRequestedGain(int flatValue, int rxtype, int& LNAstate, int& gr);
+	void selectChannel(sdrplay_api_TunerSelectT tunerId);
 
 	//Reference: rtl_tcp.c fct command_worker, line 277
 	//Copied from QIRX
@@ -203,6 +189,7 @@ private:
 		, CMD_SET_BIAS_T = 14				  //int on
 		, CMD_SET_RSP2_ANTENNA_CONTROL = 33   //int Antenna Select
 		, CMD_SET_FREQUENCYCORRECTION_PPM100 = 0x4a            // int ppm*100
+		, CMD_SET_RSP_LNA_STATE = 0x4b        // 0: most sensitive, 8: least sensitive
 	};
 
 	// This server is able to stream native 16-bit data (of "short" type)
@@ -245,5 +232,7 @@ private:
 	//to prevent overrun in the device in the error case
 	int cbksPerSecond = 0;
 	bool cbkTimerStarted = false;
+
+	sdrplay_api_RxChannelParamsT* pCurCh;
 };
 

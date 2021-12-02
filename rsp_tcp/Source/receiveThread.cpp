@@ -136,6 +136,9 @@ void* receive(void* p)
 			case (int)sdrplay_device::CMD_SET_RSP2_ANTENNA_CONTROL:
 				md->setAntenna(value);
 				break;
+			case (int)sdrplay_device::CMD_SET_RSP_LNA_STATE:
+				md->setLNAState(value);
+				break;
 			default:
 				printf("Unknown Command; 0x%x 0x%x 0x%x 0x%x 0x%x\n",
 					rxBuf[0], rxBuf[1], rxBuf[2], rxBuf[3], rxBuf[4]);

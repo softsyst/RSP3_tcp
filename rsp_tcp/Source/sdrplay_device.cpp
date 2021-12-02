@@ -39,12 +39,6 @@ sdrplay_device::sdrplay_device()
 	pthread_mutex_init(&mutex_rxThreadStarted, NULL);
 	pthread_cond_init(&started_cond, NULL);
 
-	for (int i = 0; i < MAX_TUNERS; i++)
-	{
-		selectedTuner_t* pt = new selectedTuner_t(i);
-		tuners[i] = pt;
-	}
-
 #ifdef TIME_MEAS
 	Count1.LowPart = Count2.LowPart = 0;
 	Count1.HighPart = Count2.HighPart = 0;
@@ -103,24 +97,6 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 
 	flatGr = false;
 
-	sdrplay_api_TunerSelectT tuner = pd->tuner;
-	if (pd->hwVer == SDRPLAY_RSPduo_ID)
-	{
-		switch (pargs->Tuner)
-		{
-			//case 0: pd->tuner = sdrplay_api_Tuner_Nothing; break;
-			case 1: pd->tuner = sdrplay_api_Tuner_A; break;
-			case 2: pd->tuner = sdrplay_api_Tuner_B; break;
-			case 3: pd->tuner = sdrplay_api_Tuner_Both; break; // not suitable to switch tuners
-			default: pd->tuner = sdrplay_api_Tuner_A; break;
-		}
-		if (pargs->Master == 0)
-			// Always create two tuners, to be able to switch
-			pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
-		else
-			pd->rspDuoMode = sdrplay_api_RspDuoMode_Master;
-	}
-
 
 	sdrplay_api_ErrT err;
 		// Select chosen device
@@ -134,21 +110,61 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 	//	cout << "Debug Enabled!" << endl;
 	//else
 	//	cout << "*** Debug Enabled failed with " << sdrplay_api_GetErrorString(err) << endl;
-
+	if ((err = sdrplay_api_DisableHeartbeat())  != sdrplay_api_Success)
+	{
+		printf("sdrplay_api_DisableHeartbeat failed %s\n", sdrplay_api_GetErrorString(err));
+		throw msg_exception("Error in tuner initialisation.");
+	}
 	// Unlock API now that device is selected
 	// Retrieve device parameters so they can be changed if wanted
-	if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams)) !=
-		sdrplay_api_Success)
+	if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams))  != sdrplay_api_Success)
 	{
-		printf("sdrplay_api_GetDeviceParams failed %s\n",
-			sdrplay_api_GetErrorString(err));
+		printf("sdrplay_api_GetDeviceParams failed %s\n", sdrplay_api_GetErrorString(err));
 		throw msg_exception("Error in tuner initialisation.");
 	}
 
+	sdrplay_api_TunerSelectT tuner = pd->tuner;
+	if (pd->hwVer == SDRPLAY_RSPduo_ID)
+	{
+		switch (pargs->Tuner)
+		{
+			//case 0: pd->tuner = sdrplay_api_Tuner_Nothing; break;
+			case 1: pd->tuner = sdrplay_api_Tuner_A; 
+				pCurCh = deviceParams->rxChannelA;
+				break;
+			case 2: pd->tuner = sdrplay_api_Tuner_B; 
+				pCurCh = deviceParams->rxChannelB;
+				break;
+			case 3: pd->tuner = sdrplay_api_Tuner_Both; 
+				break; // not suitable to switch tuners
+			default: pd->tuner = sdrplay_api_Tuner_A; 
+				pCurCh = deviceParams->rxChannelA;
+				break;
+		}
+		if (pargs->Master == 0)
+			// Always create two tuners, to be able to switch
+			pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+		else
+			pd->rspDuoMode = sdrplay_api_RspDuoMode_Master;
+	}
 	//createChannels();
 
 	sdrplay_api_UnlockDeviceApi();
 }
+void sdrplay_device::selectChannel(sdrplay_api_TunerSelectT tunerId)
+{
+	if (tunerId == sdrplay_api_Tuner_A)
+	{
+		pDevice->tuner = sdrplay_api_Tuner_A;
+		pCurCh = deviceParams->rxChannelA;
+	}
+	else if (tunerId == sdrplay_api_Tuner_B)
+	{
+		pDevice->tuner = sdrplay_api_Tuner_B;
+		pCurCh = deviceParams->rxChannelB;
+	}
+}
+
 
 void sdrplay_device::cleanup()
 {
@@ -194,21 +210,17 @@ void sdrplay_device::writeWelcomeString() const
 /// </summary>
 /// <returns>current gain</returns>
 /// <remark>running in the context of the controlThread</remark>
-float sdrplay_device::getGainValues()
+sdrplay_api_GainValuesT* sdrplay_device::getGainValues()
 {
-	sdrplay_api_GainValuesT gainVals;
-	if (getDevice()->tuner == sdrplay_api_Tuner_A)
+	//sdrplay_api_GainValuesT gainVals;
+	if (getDevice()->tuner == sdrplay_api_Tuner_A || getDevice()->tuner == sdrplay_api_Tuner_B)
 	{
-		gainVals = deviceParams->rxChannelA->tunerParams.gain.gainVals;
-	}
-	else if (getDevice()->tuner == sdrplay_api_Tuner_B)
-	{
-		gainVals = deviceParams->rxChannelB->tunerParams.gain.gainVals;
+		memcpy(&GainValues, &pCurCh->tunerParams.gain.gainVals, sizeof(GainValues));
 	}
 	else //TODO sdrplay_api_Tuner_Both
-		return -1;
+		return 0;
 
-	return gainVals.curr;
+	return &GainValues;
 }
 
 void sdrplay_device::start(SOCKET client)
@@ -322,8 +334,8 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 			sdrplay_api_Overload_Detected)
 		{
 			md->overloaded_A = true;
-			int gr = md->deviceParams->rxChannelA->tunerParams.gain.gRdB;
-			int lnastate = md->deviceParams->rxChannelA->tunerParams.gain.LNAstate;
+			int gr = md->pCurCh->tunerParams.gain.gRdB;
+			int lnastate = md->pCurCh->tunerParams.gain.LNAstate;
 			cout << "Overload detected on tuner A with lnastate " << lnastate << " and grdB: " << gr << endl;
 			//md->increaseLNAstate_A(2);
 		}
@@ -334,21 +346,19 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 			cout << "Overload corrected on tuner A" << endl;
 			//md->deviceParams->rxChannelB->tunerParams.gain.gRdB +=1;
 		}
-		//else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
-		//	sdrplay_api_Overload_Detected)
-		//{
-		//	md->overloaded_B = true;
-		//	cout << "Overload detected on tuner B" << endl;
-		//	md->deviceParams->rxChannelB->tunerParams.gain.gRdB +=1;
-		//}
+		else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
+			sdrplay_api_Overload_Detected)
+		{
+			md->overloaded_B = true;
+			cout << "Overload detected on tuner B" << endl;
+		}
 
-		//else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
-		//	sdrplay_api_Overload_Corrected)
-		//{
-		//	md->overloaded_B = false;
-		//	cout << "Overload corrected on tuner B" << endl;
-		//	//md->deviceParams->rxChannelB->tunerParams.gain.gRdB +=1;
-		//}
+		else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
+			sdrplay_api_Overload_Corrected)
+		{
+			md->overloaded_B = false;
+			cout << "Overload corrected on tuner B" << endl;
+		}
 
 		// Send update message to acknowledge power overload message received
 		sdrplay_api_Update(md->pDevice->dev, tuner, sdrplay_api_Update_Ctrl_OverloadMsgAck,
@@ -388,20 +398,28 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 	}
 }
 
-void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params, unsigned int numSamples, unsigned int reset, void *cbContext)
+void streamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params,
+	unsigned int numSamples, unsigned int reset, void* cbContext)
+{
+	if (reset)
+		printf("sdrplay_api_StreamACallback: numSamples=%d\n", numSamples);
+	
+	streamCallback(xi, xq, params, numSamples, reset, cbContext);
+}
+
+void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params, 
+	unsigned int numSamples, unsigned int reset, void *cbContext)
 {
 	if (reset)
 		printf("sdrplay_api_StreamBCallback: numSamples=%d\n", numSamples);
 	// Process stream callback data here - this callback will only be used in dual tuner mode
+		streamCallback(xi, xq, params, numSamples, reset, cbContext);
 	return;
 }
 
-void streamACallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params, 
+void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params, 
 	unsigned int numSamples, unsigned int reset, void *cbContext)
 {
-
-	if (reset)
-		printf("sdrplay_api_StreamACallback: numSamples=%d\n", numSamples);
 
 	static int count = 0;
 
@@ -474,9 +492,11 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	Initialized = false;
 	sdrplay_api_DeviceT* pd = pDevice;
 	//pd->rspDuoSampleFreq = currentSamplingRateHz;
+	selectChannel(sdrplay_api_Tuner_A);
+
 
 	// next doesn't work in master/slave mode, 
-	deviceParams->rxChannelA->tunerParams.ifType = sdrplay_api_IF_Zero;
+	pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
 	deviceParams->devParams->fsFreq.fsHz = currentSamplingRateHz; // initially set in init
 	int ix = getSamplingConfigurationTableIndex(currentSamplingRateHz);
 	if (ix < 0)
@@ -486,17 +506,17 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	}
 
 	//// next doesn't work in master/slave mode, 
-	deviceParams->rxChannelA->tunerParams.bwType = samplingConfigs[ix].bandwidth;
+	pCurCh->tunerParams.bwType = samplingConfigs[ix].bandwidth;
 	byte decimationFactor = samplingConfigs[ix].decimationFactor;
-	deviceParams->rxChannelA->ctrlParams.decimation.decimationFactor = decimationFactor;
-	deviceParams->rxChannelA->ctrlParams.decimation.enable = decimationFactor == 1 ? 0 : 1;
-	deviceParams->rxChannelA->ctrlParams.decimation.wideBandSignal = currentSamplingRateHz == 2000000 ? 1 : 0;
-	deviceParams->rxChannelA->tunerParams.rfFreq.rfHz = 222064000;
+	pCurCh->ctrlParams.decimation.decimationFactor = decimationFactor;
+	pCurCh->ctrlParams.decimation.enable = decimationFactor == 1 ? 0 : 1;
+	pCurCh->ctrlParams.decimation.wideBandSignal = currentSamplingRateHz == 2000000 ? 1 : 0;
+	pCurCh->tunerParams.rfFreq.rfHz = 222064000;
 
-	deviceParams->rxChannelA->ctrlParams.agc.setPoint_dBfs = -60;
-	deviceParams->rxChannelA->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
-	deviceParams->rxChannelA->tunerParams.gain.gRdB = gainReduction;
-	deviceParams->rxChannelA->tunerParams.gain.LNAstate = LNAstate;
+	pCurCh->ctrlParams.agc.setPoint_dBfs = -60;
+	pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
+	pCurCh->tunerParams.gain.gRdB = gainReduction;
+	pCurCh->tunerParams.gain.LNAstate = LNAstate;
 
 	// next doesn't work in master/slave mode, 
 	//deviceParams->rxChannelB->tunerParams.ifType = sdrplay_api_IF_Zero;
@@ -519,12 +539,6 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	cbFns.StreamBCbFn = streamBCallback;
 	cbFns.EventCbFn = eventCallback;
 
-	tuners[0]->channel = deviceParams->rxChannelA;
-	tuners[1]->channel = deviceParams->rxChannelB;
-
-	tuners[0]->streamCallback = streamACallback;
-	tuners[1]->streamCallback = streamBCallback;
-
 	sdrplay_api_ErrT errInit = sdrplay_api_Init(pDevice->dev, &cbFns, this);
 	cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
 	Initialized = true;
@@ -540,7 +554,7 @@ void gainChangeCallback(unsigned int gRdB, unsigned int lnaGRdB, void* cbContext
 
 sdrplay_api_ErrT sdrplay_device::setFrequency(int valueHz)
 {
-	deviceParams->rxChannelA->tunerParams.rfFreq.rfHz = valueHz;
+	pCurCh->tunerParams.rfFreq.rfHz = valueHz;
 
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
@@ -622,7 +636,7 @@ sdrplay_api_ErrT sdrplay_device::setGain(int value)
 		double dgr = grMin + gred * grunit;
 		gr = gainReduction = (int)(dgr + 0.5);
 
-		deviceParams->rxChannelA->tunerParams.gain.gRdB = gainReduction;
+		pCurCh->tunerParams.gain.gRdB = gainReduction;
 		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 			sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
 		if (VERBOSE)
@@ -737,15 +751,15 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 	if (on == false)
 	{
 		AGC_A = false;
-		deviceParams->rxChannelA->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
+		pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
 		cout << "\nAGC OFF returned with: " << err << endl;
 	}
 	else
 	{
 		AGC_A = true;
 		// enable AGC with a setPoint of -15dBfs //optimum for DAB
-		deviceParams->rxChannelA->ctrlParams.agc.setPoint_dBfs = -15;// -60;
-		deviceParams->rxChannelA->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
+		pCurCh->ctrlParams.agc.setPoint_dBfs = -15;// -60;
+		pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
 		cout << "\nsdrplay_api_AgcControl 50Hz, " << agcPoint_dBfs << " dBfs returned with: " << err << endl;
 	}
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
@@ -759,21 +773,37 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 	return err;
 }
 
-sdrplay_api_ErrT sdrplay_device::increaseLNAstate_A(int step)
+sdrplay_api_ErrT sdrplay_device::setLNAState(int value)
 {
+	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz);
+	if (band == Band_Invalid)
+		return sdrplay_api_OutOfRange;
+	gainConfiguration gcfg(band);
 
-	int lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-	if (lnastate+step <= 7)
-		lnastate += step;
+	int lnaStates = gcfg.LNAstates[rxType][band];
 
-	deviceParams->rxChannelA->tunerParams.gain.LNAstate = (byte)lnastate;
+	if (value < 0 || value >= lnaStates)
+	{
+		cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " available." << endl;
+		return sdrplay_api_OutOfRange;
+	}
+	if ( gcfg.IsGrInvalid(rxType, value, band))
+	{
+		cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " is invalid." << endl;
+		return sdrplay_api_OutOfRange;
+	}
 
+
+	int lnastate = pCurCh->tunerParams.gain.LNAstate;
+	if (value == lnastate)
+		return sdrplay_api_Success;
+
+	pCurCh->tunerParams.gain.LNAstate = (byte)value;
 	sdrplay_api_ErrT err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-	lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
+	lnastate = pCurCh->tunerParams.gain.LNAstate;
 
-	if (VERBOSE)
-		cout << "New lnastate returned with " << err << " and new lnastate " << lnastate << endl;
+	cout << "New lnastate returned with " << err << " and new lnastate " << lnastate << endl;
 	return err;
 }
 
@@ -894,17 +924,17 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 	switch (rxType)
 	{
 		case RSP1A:
-			deviceParams->rxChannelA->rsp1aTunerParams.biasTEnable = value;
+			pCurCh->rsp1aTunerParams.biasTEnable = value;
 			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_Rsp1a_BiasTControl, sdrplay_api_Update_Ext1_None);
 			break;
 		case RSP2:
-			deviceParams->rxChannelA->rsp2TunerParams.biasTEnable = value;
+			pCurCh->rsp2TunerParams.biasTEnable = value;
 			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_Rsp2_BiasTControl, sdrplay_api_Update_Ext1_None);
 			break;
 		case RSPduo:
-			deviceParams->rxChannelA->rspDuoTunerParams.biasTEnable = value;
+			pCurCh->rspDuoTunerParams.biasTEnable = value;
 			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_RspDuo_BiasTControl, sdrplay_api_Update_Ext1_None);
 			break;
@@ -928,16 +958,30 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 			err = sdrplay_api_InvalidParam;
 			break;
 		case RSP2:
-			deviceParams->rxChannelA->rsp2TunerParams.antennaSel = (sdrplay_api_Rsp2_AntennaSelectT)value;
+			pCurCh->rsp2TunerParams.antennaSel = (sdrplay_api_Rsp2_AntennaSelectT)value;
 			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_Rsp2_AntennaControl, sdrplay_api_Update_Ext1_None);
 			break;
 		case RSPduo:
-			//for the next line to work, the ChannelB must be prepared
-			//err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_1);// , sdrplay_api_RspDuo_AMPORT_2);
-			err = sdrplay_api_InvalidParam;
+			if (value == 5) //Tuner A requested
+			{
+				if (pDevice->tuner != sdrplay_api_Tuner_A)
+				{
+					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_2);// , sdrplay_api_RspDuo_AMPORT_1);
+					if (err == sdrplay_api_Success)
+						selectChannel(sdrplay_api_Tuner_A);
+				}
+			}
+			else if (value == 6) //Tuner B requested
+			{
+				if (pDevice->tuner != sdrplay_api_Tuner_B)
+					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_2);// , sdrplay_api_RspDuo_AMPORT_1);
+					if (err == sdrplay_api_Success)
+						selectChannel(sdrplay_api_Tuner_B);
+			}
 			break;
 		default:
+			//err = sdrplay_api_InvalidParam;
 			break;
 	}
 

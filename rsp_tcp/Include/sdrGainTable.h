@@ -44,7 +44,7 @@ struct gainConfiguration
 	// get the band id of the matrix tables
 	// the AM(HiZ Port) is not covered
 	// RSPdx is not covered
-	int LNAstates[4][internalBands] =    //number of LNAstates depending on rxType and band
+	const int LNAstates[4][internalBands] =    //number of LNAstates depending on rxType and band
 	{
 		{4, 4, 4, 4},				// RSP1
 		{7,10,10, 9},				// RSP1A
@@ -62,6 +62,7 @@ struct gainConfiguration
 	gainConfiguration(t_freqBand band);
 
 	bool calculateGrValues(int flatValue, int rxtype, int& LNAstate, int& gr);
+	bool IsGrInvalid(int rxType, int lnastate, int band);
 };
 
 
