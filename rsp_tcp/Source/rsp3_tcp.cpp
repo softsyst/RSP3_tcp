@@ -196,15 +196,6 @@ int main(int argc, char* argv[])
 			cout << "\tHardware Version: " << (int)pd->hwVer << endl;
 			cout << "\n";
 		}
-		//if (devices::instance().SelectDevice(pargs))
-		//{
-		//	std::cout << "Device with Serial " << devices::instance().SelectedDevice->serno() << " selected." << endl;
-		//}
-		//else
-		//{
-		//	std::cout << "No matching device found." << endl;
-		//	goto exit;
-		//}
 		devices::instance().Start(pargs);
 		goto close;
 	}

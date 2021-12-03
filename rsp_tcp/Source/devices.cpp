@@ -30,56 +30,6 @@
 using namespace std;
 static rsp_cmdLineArgs* pargs = 0;
 
-//bool devices::SelectDevice(rsp_cmdLineArgs*  args)
-//{
-//	if (pargs == 0)
-//		pargs = args;
-//	sdrplay_api_TunerSelectT tun = (sdrplay_api_TunerSelectT)pargs->Tuner;
-//	SelectedDevice = 0;
-//
-//	sdrplay_device* sdev = new sdrplay_device();
-//
-//	if ((tun == sdrplay_api_Tuner_B) || (tun == sdrplay_api_Tuner_Both) ||
-//		(pargs->Master == true)) // requires RSPduo
-//	{
-//		// Choose device: Algo adapted from sdrplay's example
-//		for (int i=0; i < numDevices; i++)
-//		{
-//			// Pick first RSPduo
-//			sdrplay_api_DeviceT* pd = &sdrplayDevices[i];
-//			string devserno = string(pd->SerNo);
-//			if (common::hasEnding(devserno, pargs->Serial) &&
-//				pd->hwVer == SDRPLAY_RSPduo_ID )
-//			{
-//				sdev->setDevice(pd);
-//				SelectedDevice = sdev;
-//				break;
-//			}
-//		}
-//	}
-//	else
-//	{
-//		for (int i = 0; i < numDevices; i++)
-//		{
-//			// Pick first 
-//			sdrplay_api_DeviceT* pd = &sdrplayDevices[i];
-//			string devserno = string(pd->SerNo);
-//			if (common::hasEnding(devserno, pargs->Serial))
-//			{
-//				sdev->setDevice(pd);
-//				SelectedDevice = sdev;
-//				break;
-//			}
-//		}
-//	}
-//	if (SelectedDevice == 0)
-//	{
-//		delete sdev;
-//		return false;
-//	}
-//
-//	return true;
-//}
 /// <summary>
 /// Collect all sdrplay devices
 /// </summary>
@@ -179,24 +129,10 @@ void devices::doListen()
 
 		while (sock != INVALID_SOCKET)
 		{
-			//if (SelectDevice(pargs))
-			//{
-			//	std::cout << "Device with Serial " << devices::instance().SelectedDevice->serno() << " selected." << endl;
-			//}
-			//else
-			//{
-			//	std::cout << "No matching device found." << endl;
-			//	break;
-			//}
-			//currentDevice = 0;
-
 			sdrplay_device* pd = new sdrplay_device(pargs);
 			if (pd == 0)
 				return;
-			//pd->init(pargs);
 
-			//// create the control thread and its socket communication
-			//pd->createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
 
 			cout << "Listening to " << pargs->Address.sIPAddress << ":" << to_string(pargs->Port) << endl;
 			socklen_t rlen = sizeof(remote);
@@ -220,7 +156,7 @@ void devices::doListen()
 			closesocket(clientSocket);
 			pd->remoteClient = INVALID_SOCKET;
 			cout << "Socket closed\n\n";
-
+			delete pd;
 		}
 	}
 	catch (exception& e)
