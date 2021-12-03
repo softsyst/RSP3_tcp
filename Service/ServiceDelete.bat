@@ -1,0 +1,1 @@
+sc.exe DELETE "SDRplayAPIService"

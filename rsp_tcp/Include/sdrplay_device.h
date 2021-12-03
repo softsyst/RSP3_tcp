@@ -79,14 +79,16 @@ void *ctrl_thread_fn(void *arg);
 class sdrplay_device
 {
 public:
-	sdrplay_device();
+	sdrplay_device(rsp_cmdLineArgs* args);
 	~sdrplay_device();
 
 private:
+	sdrplay_device() {}
 	int getSamplingConfigurationTableIndex(int requestedSrHz);
 	void writeWelcomeString() const;
 	void cleanup();
 	sdrplay_api_DeviceT* pDevice;
+	rsp_cmdLineArgs* pargs;
 
 	friend void* receive(void* p);
 	//friend void streamACallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
@@ -133,7 +135,10 @@ public:
 	/// API: Device Enumeration Structure
 	/// </summary>
 	string serno() { if (pDevice == 0) return "";  return pDevice->SerNo; }		// serial number
-	BYTE hwVer()   { if (pDevice == 0) return 0; return pDevice->hwVer; }			// HW version
+	BYTE hwVer()   { if (pDevice == 0) return 0; return pDevice->hwVer; }
+	int deviceCount() { return numDevices; }
+
+	// HW version
 	HANDLE hdl;         // Handle of the device
 	sdrplay_api_DeviceParamsT *deviceParams = NULL;
 	bool isStreaming;
@@ -155,6 +160,13 @@ public:
 	bool Initialized = false;
 
 private:
+	sdrplay_api_DeviceT sdrplayDevices[MAX_DEVICES];
+	int numDevices;
+
+	bool RSPGainValuesFromRequestedGain(int flatValue, int rxtype, int& LNAstate, int& gr);
+	bool selectDevice(rsp_cmdLineArgs* args);
+	void selectChannel(sdrplay_api_TunerSelectT tunerId);
+	bool collectDevices();
 
 	const int c_welcomeMessageLength = 100;
 	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen);
@@ -169,8 +181,6 @@ private:
 	sdrplay_api_ErrT setGain(int value);
 	sdrplay_api_ErrT setSamplingRate(int requestedSrHz);
 	sdrplay_api_ErrT stream_Uninit();
-	bool RSPGainValuesFromRequestedGain(int flatValue, int rxtype, int& LNAstate, int& gr);
-	void selectChannel(sdrplay_api_TunerSelectT tunerId);
 
 	//Reference: rtl_tcp.c fct command_worker, line 277
 	//Copied from QIRX

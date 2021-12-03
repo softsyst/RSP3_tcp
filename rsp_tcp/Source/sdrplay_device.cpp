@@ -33,16 +33,113 @@ sdrplay_device::~sdrplay_device()
 	pthread_cond_destroy(&started_cond);
 }
 
-sdrplay_device::sdrplay_device() 
+sdrplay_device::sdrplay_device(rsp_cmdLineArgs* args) 
 {
+	pargs = args;
 	thrdRx = 0;
+	numDevices = 0;
 	pthread_mutex_init(&mutex_rxThreadStarted, NULL);
 	pthread_cond_init(&started_cond, NULL);
 
+	// create the control thread and its socket communication
+	createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
 #ifdef TIME_MEAS
 	Count1.LowPart = Count2.LowPart = 0;
 	Count1.HighPart = Count2.HighPart = 0;
 #endif
+}
+/// <summary>
+/// Collect all sdrplay devices
+/// </summary>
+/// <returns></returns>
+bool sdrplay_device::collectDevices()
+{
+	try
+	{
+		{
+			sdrplay_api_ErrT err;
+			err = sdrplay_api_GetDevices(sdrplayDevices, (unsigned int*)&numDevices, MAX_DEVICES);
+			if (numDevices == 0)
+				return false;
+
+			int ierr = (int)err;
+			string error = "sdrplay_api_GetDevices failed with error :" + to_string(ierr);
+			cout << "sdrplay_api_GetDevices returned with: " << err << endl;
+			for (int i = 0; i < numDevices; i++)
+			{
+				if (err != sdrplay_api_Success)
+					throw msg_exception(error.c_str());
+
+				if ((sdrplayDevices[i].hwVer < 1 || sdrplayDevices[i].hwVer > 3) &&
+					sdrplayDevices[i].hwVer != 255)
+				{
+					printf("Unknown Hardware version %d .\n", sdrplayDevices[i].hwVer);
+					continue;
+				}
+			}
+		}
+	}
+	catch (exception& e)
+	{
+		cout << "Error reading devices: " << e.what() << endl;
+		return false;
+	}
+	return true;
+}
+
+bool sdrplay_device::selectDevice(rsp_cmdLineArgs* args)
+{
+	collectDevices();
+	////if (pargs == 0)
+	//	pargs = args;
+	sdrplay_api_TunerSelectT tun = (sdrplay_api_TunerSelectT)args->Tuner;
+
+	if ((tun == sdrplay_api_Tuner_B) || (tun == sdrplay_api_Tuner_Both) ||
+		(args->Master == true)) // requires RSPduo
+	{
+		// Choose device: Algo adapted from sdrplay's example
+		for (int i = 0; i < numDevices; i++)
+		{
+			// Pick first RSPduo
+			sdrplay_api_DeviceT* pd = &sdrplayDevices[i];
+			string devserno = string(pd->SerNo);
+			if (common::hasEnding(devserno, pargs->Serial) &&
+				pd->hwVer == SDRPLAY_RSPduo_ID)
+			{
+				setDevice(pd);
+				pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+				break;
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < numDevices; i++)
+		{
+			// Pick first 
+			sdrplay_api_DeviceT* pd = &sdrplayDevices[i];
+			string devserno = string(pd->SerNo);
+			if (common::hasEnding(devserno, pargs->Serial))
+			{
+				pd->tuner = sdrplay_api_Tuner_A;
+				setDevice(pd); //pDevice
+				if (pd->hwVer == SDRPLAY_RSPduo_ID)
+					pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+				break;
+			}
+		}
+	}
+	if (pDevice == 0)
+	{
+		return false;
+	}
+	// Select chosen device
+	if ((err = sdrplay_api_SelectDevice(pDevice)) != sdrplay_api_Success)
+	{
+		printf("sdrplay_api_SelectDevice failed %s\n", sdrplay_api_GetErrorString(err));
+	}
+
+	return true;
 }
 
 void sdrplay_device::createCtrlThread(const char* addr, int port)
@@ -67,6 +164,38 @@ void sdrplay_device::createCtrlThread(const char* addr, int port)
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	int res = pthread_create(thrdCtrl, &attr, &ctrl_thread_fn, &ctrlThreadData);
+	pthread_attr_destroy(&attr);
+}
+
+void sdrplay_device::start(SOCKET client)
+{
+	// Lock API while device selection is performed
+	sdrplay_api_LockDeviceApi();
+	selectDevice(pargs);
+	// Unlock API now that device is selected
+	sdrplay_api_UnlockDeviceApi();
+
+	init(pargs);
+	started = true;
+	Sleep(1000);
+	remoteClient = client;
+	writeWelcomeString();
+
+	cout << endl << "Starting..." << endl;
+
+
+	if (thrdRx != 0) // just in case..
+	{
+		pthread_cancel(*thrdRx);
+		delete thrdRx;
+		thrdRx = 0;
+	}
+	thrdRx = new pthread_t();
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	int res = pthread_create(thrdRx, &attr, &receive, this);
 	pthread_attr_destroy(&attr);
 }
 
@@ -99,23 +228,8 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 
 
 	sdrplay_api_ErrT err;
-		// Select chosen device
-	if ((err = sdrplay_api_SelectDevice(pd)) != sdrplay_api_Success)
-	{
-		printf("sdrplay_api_SelectDevice failed %s\n", sdrplay_api_GetErrorString(err));
-	}
 
-	//// Enable debug logging output
-	//if ((err = sdrplay_api_DebugEnable(pd->dev, sdrplay_api_DbgLvl_Verbose)) == sdrplay_api_Success)
-	//	cout << "Debug Enabled!" << endl;
-	//else
-	//	cout << "*** Debug Enabled failed with " << sdrplay_api_GetErrorString(err) << endl;
-	if ((err = sdrplay_api_DisableHeartbeat())  != sdrplay_api_Success)
-	{
-		printf("sdrplay_api_DisableHeartbeat failed %s\n", sdrplay_api_GetErrorString(err));
-		throw msg_exception("Error in tuner initialisation.");
-	}
-	// Unlock API now that device is selected
+
 	// Retrieve device parameters so they can be changed if wanted
 	if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams))  != sdrplay_api_Success)
 	{
@@ -124,32 +238,31 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 	}
 
 	sdrplay_api_TunerSelectT tuner = pd->tuner;
-	if (pd->hwVer == SDRPLAY_RSPduo_ID)
-	{
-		switch (pargs->Tuner)
-		{
-			//case 0: pd->tuner = sdrplay_api_Tuner_Nothing; break;
-			case 1: pd->tuner = sdrplay_api_Tuner_A; 
-				pCurCh = deviceParams->rxChannelA;
-				break;
-			case 2: pd->tuner = sdrplay_api_Tuner_B; 
-				pCurCh = deviceParams->rxChannelB;
-				break;
-			case 3: pd->tuner = sdrplay_api_Tuner_Both; 
-				break; // not suitable to switch tuners
-			default: pd->tuner = sdrplay_api_Tuner_A; 
-				pCurCh = deviceParams->rxChannelA;
-				break;
-		}
-		if (pargs->Master == 0)
-			// Always create two tuners, to be able to switch
-			pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
-		else
-			pd->rspDuoMode = sdrplay_api_RspDuoMode_Master;
-	}
-	//createChannels();
+	cout << "Tuner " << tuner << " selected";
 
-	sdrplay_api_UnlockDeviceApi();
+	//{
+	//	switch (pargs->Tuner)
+	//	{
+	//		//case 0: pd->tuner = sdrplay_api_Tuner_Nothing; break;
+	//		case 1: pd->tuner = sdrplay_api_Tuner_A; 
+	//			pCurCh = deviceParams->rxChannelA;
+	//			break;
+	//		case 2: pd->tuner = sdrplay_api_Tuner_B; 
+	//			pCurCh = deviceParams->rxChannelB;
+	//			break;
+	//		case 3: pd->tuner = sdrplay_api_Tuner_Both; 
+	//			break; // not suitable to switch tuners
+	//		default: pd->tuner = sdrplay_api_Tuner_A; 
+	//			pCurCh = deviceParams->rxChannelA;
+	//			break;
+	//	}
+	//	if (pargs->Master == 0)
+	//		// Always create two tuners, to be able to switch
+			//pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+	//	else
+	//		pd->rspDuoMode = sdrplay_api_RspDuoMode_Master;
+	//}
+	createChannels();
 }
 void sdrplay_device::selectChannel(sdrplay_api_TunerSelectT tunerId)
 {
@@ -212,6 +325,8 @@ void sdrplay_device::writeWelcomeString() const
 /// <remark>running in the context of the controlThread</remark>
 sdrplay_api_GainValuesT* sdrplay_device::getGainValues()
 {
+	if (!started)
+		return 0;
 	//sdrplay_api_GainValuesT gainVals;
 	if (getDevice()->tuner == sdrplay_api_Tuner_A || getDevice()->tuner == sdrplay_api_Tuner_B)
 	{
@@ -221,31 +336,6 @@ sdrplay_api_GainValuesT* sdrplay_device::getGainValues()
 		return 0;
 
 	return &GainValues;
-}
-
-void sdrplay_device::start(SOCKET client)
-{
-	started = true;
-
-	remoteClient = client;
-	writeWelcomeString();
-
-	cout << endl << "Starting..." << endl;
-
-
-	if (thrdRx != 0) // just in case..
-	{
-		pthread_cancel(*thrdRx );
-		delete thrdRx;
-		thrdRx = 0;
-	}
-	thrdRx = new pthread_t();
-
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	int res = pthread_create(thrdRx, &attr, &receive, this);
-	pthread_attr_destroy(&attr);
 }
 
 BYTE* sdrplay_device::mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen)
@@ -497,6 +587,7 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 
 	// next doesn't work in master/slave mode, 
 	pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
+
 	deviceParams->devParams->fsFreq.fsHz = currentSamplingRateHz; // initially set in init
 	int ix = getSamplingConfigurationTableIndex(currentSamplingRateHz);
 	if (ix < 0)
@@ -532,8 +623,6 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	//gainReduction = 40;
 	//LNAstate = 0;
 
-	int smplsPerPacket;
-
 	sdrplay_api_CallbackFnsT cbFns;
 	cbFns.StreamACbFn = streamACallback;
 	cbFns.StreamBCbFn = streamBCallback;
@@ -542,7 +631,7 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	sdrplay_api_ErrT errInit = sdrplay_api_Init(pDevice->dev, &cbFns, this);
 	cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
 	Initialized = true;
-	double fs = deviceParams->devParams->fsFreq.fsHz;
+	//double fs = deviceParams->devParams->fsFreq.fsHz;
 	return errInit;
 }
 
@@ -822,8 +911,6 @@ sdrplay_api_ErrT sdrplay_device::setSamplingRate(int requestedSrHz)
 		}
 		else
 			cout << "Uninitialize successful!" << endl;
-
-
 	}
 	int ix = getSamplingConfigurationTableIndex(requestedSrHz);
 	if (ix >= 0)

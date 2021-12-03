@@ -161,7 +161,11 @@ void *ctrl_thread_fn(void *arg)
 			total_gain = 123;
 			result = 0;
 			
-			float gain = dev->getGainValues()->curr;
+			sdrplay_api_GainValuesT* gvals = dev->getGainValues();
+			if (gvals == 0)	// too early
+				goto sleep;
+
+			float gain = gvals->curr;
 			if (gain > 0)
 				total_gain = (int)(gain * 10.0f);
 
