@@ -74,16 +74,19 @@ typedef struct
 }
 ctrl_thread_data_t;
 void *ctrl_thread_fn(void *arg);
-
+class crc32;
 
 class sdrplay_device
 {
 public:
 	sdrplay_device(rsp_cmdLineArgs* args);
-	~sdrplay_device();
+	virtual ~sdrplay_device();
+	sdrplay_api_CallbackFnsT cbFns;
 
 private:
 	sdrplay_device() {}
+	crc32* _crc32;
+
 	int getSamplingConfigurationTableIndex(int requestedSrHz);
 	void writeWelcomeString() const;
 	void cleanup();
@@ -157,14 +160,17 @@ public:
 	//The socket of the remote app
 	SOCKET remoteClient;
 
+	bool DeviceSelected = false;
 	bool Initialized = false;
 
 private:
 	sdrplay_api_DeviceT sdrplayDevices[MAX_DEVICES];
+	uint32_t serialCRCs[MAX_DEVICES];
 	int numDevices;
 
 	bool RSPGainValuesFromRequestedGain(int flatValue, int rxtype, int& LNAstate, int& gr);
-	bool selectDevice(rsp_cmdLineArgs* args);
+	//bool selectDevice(rsp_cmdLineArgs* args);
+	sdrplay_api_ErrT  selectDevice(uint32_t crc);
 	void selectChannel(sdrplay_api_TunerSelectT tunerId);
 	bool collectDevices();
 
@@ -200,6 +206,7 @@ private:
 		, CMD_SET_RSP2_ANTENNA_CONTROL = 33   //int Antenna Select
 		, CMD_SET_FREQUENCYCORRECTION_PPM100 = 0x4a            // int ppm*100
 		, CMD_SET_RSP_LNA_STATE = 0x4b        // 0: most sensitive, 8: least sensitive
+		, CMD_SET_RSP_SELECT_SERIAL = 0x80    // value is four bytes CRC-32 of the requested serial number
 	};
 
 	// This server is able to stream native 16-bit data (of "short" type)

@@ -20,6 +20,7 @@
 //#define TIME_MEAS
 #include "sdrplay_device.h"
 #include "sdrGainTable.h"
+#include "crc32.h"
 //#include "MeasTimeDiff.h"
 #include <iostream>
 using namespace std;
@@ -31,18 +32,34 @@ sdrplay_device::~sdrplay_device()
 {
 	pthread_mutex_destroy(&mutex_rxThreadStarted);
 	pthread_cond_destroy(&started_cond);
+	delete _crc32;
 }
 
 sdrplay_device::sdrplay_device(rsp_cmdLineArgs* args) 
 {
+	for (int i = 0; i < MAX_DEVICES; i++)
+	{
+		sdrplayDevices[i].dev = 0;
+		memset(&sdrplayDevices[i].SerNo, 0, 64);
+		sdrplayDevices[i].valid = 0;
+		sdrplayDevices[i].hwVer = 999;
+		sdrplayDevices[i].tuner = sdrplay_api_Tuner_Neither;
+
+		serialCRCs[i] = 0;
+	}
+	_crc32 = new crc32(0xffffffff, true, 0xedb88320);
+
 	pargs = args;
+	init(pargs);
+
 	thrdRx = 0;
 	numDevices = 0;
 	pthread_mutex_init(&mutex_rxThreadStarted, NULL);
 	pthread_cond_init(&started_cond, NULL);
 
-	// create the control thread and its socket communication
-	createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
+	//// create the control thread and its socket communication
+	//createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
+
 #ifdef TIME_MEAS
 	Count1.LowPart = Count2.LowPart = 0;
 	Count1.HighPart = Count2.HighPart = 0;
@@ -76,6 +93,7 @@ bool sdrplay_device::collectDevices()
 					printf("Unknown Hardware version %d .\n", sdrplayDevices[i].hwVer);
 					continue;
 				}
+				serialCRCs[i] = _crc32->calcCrcVal((uint8_t*)sdrplayDevices[i].SerNo, 64);
 			}
 		}
 	}
@@ -87,59 +105,100 @@ bool sdrplay_device::collectDevices()
 	return true;
 }
 
-bool sdrplay_device::selectDevice(rsp_cmdLineArgs* args)
+sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 {
+	DeviceSelected = false;
+	pDevice = 0;
+	sdrplay_api_DeviceT* pd = 0;
+	// Lock API while device selection is performed
 	collectDevices();
+	sdrplay_api_LockDeviceApi();
 	////if (pargs == 0)
 	//	pargs = args;
-	sdrplay_api_TunerSelectT tun = (sdrplay_api_TunerSelectT)args->Tuner;
+	//sdrplay_api_TunerSelectT tun = (sdrplay_api_TunerSelectT)args->Tuner;
 
-	if ((tun == sdrplay_api_Tuner_B) || (tun == sdrplay_api_Tuner_Both) ||
-		(args->Master == true)) // requires RSPduo
+	//if ((tun == sdrplay_api_Tuner_B) || (tun == sdrplay_api_Tuner_Both) ||
+	//	(args->Master == true)) // requires RSPduo
+	//{
+	//	// Choose device: Algo adapted from sdrplay's example
+	//	for (int i = 0; i < numDevices; i++)
+	//	{
+	//		// Pick first RSPduo
+	//		sdrplay_api_DeviceT* pd = &sdrplayDevices[i];
+	//		string devserno = string(pd->SerNo);
+	//		//if (common::hasEnding(devserno, pargs->Serial) &&
+	//		if (crc == serialCRCs[i] &&
+	//			pd->hwVer == SDRPLAY_RSPduo_ID)
+	//		{
+	//			setDevice(pd);
+	//			pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+	//			break;
+	//		}
+	//	}
+	//}
+	//else
 	{
-		// Choose device: Algo adapted from sdrplay's example
 		for (int i = 0; i < numDevices; i++)
 		{
-			// Pick first RSPduo
-			sdrplay_api_DeviceT* pd = &sdrplayDevices[i];
+			// Pick first if crc == 0
+			pd = &sdrplayDevices[i];
 			string devserno = string(pd->SerNo);
-			if (common::hasEnding(devserno, pargs->Serial) &&
-				pd->hwVer == SDRPLAY_RSPduo_ID)
+			if (crc == serialCRCs[i] || crc== 0 )
+			//if (common::hasEnding(devserno, pargs->Serial))
 			{
-				setDevice(pd);
-				pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
-				break;
-			}
-		}
-	}
-	else
-	{
-		for (int i = 0; i < numDevices; i++)
-		{
-			// Pick first 
-			sdrplay_api_DeviceT* pd = &sdrplayDevices[i];
-			string devserno = string(pd->SerNo);
-			if (common::hasEnding(devserno, pargs->Serial))
-			{
+				// Select chosen device
+				if ((err = sdrplay_api_SelectDevice(pd)) != sdrplay_api_Success)
+				{
+					printf("sdrplay_api_SelectDevice failed %s\n", sdrplay_api_GetErrorString(err));
+					break;
+				}
+				cout << "Device with Serial " << sdrplayDevices[i].SerNo << " selected." << endl;
 				pd->tuner = sdrplay_api_Tuner_A;
 				setDevice(pd); //pDevice
 				if (pd->hwVer == SDRPLAY_RSPduo_ID)
 					pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+
+				DeviceSelected = true;
 				break;
 			}
 		}
 	}
 	if (pDevice == 0)
+		return sdrplay_api_Fail;
+	pd = pDevice;
+	sdrplay_api_UnlockDeviceApi();
+	if (pd->hwVer == SDRPLAY_RSP1_ID)
+		rxType = RSP1;
+	else if (pd->hwVer == SDRPLAY_RSP1A_ID)
+		rxType = RSP1A;
+	else if (pd->hwVer == SDRPLAY_RSP2_ID)
+		rxType = RSP2;
+	else if (pd->hwVer == SDRPLAY_RSPduo_ID)
+		rxType = RSPduo;
+	else if (pd->hwVer == SDRPLAY_RSPdx_ID)
+		rxType = RSPdx;
+	else
+		rxType = UNKNOWN;
+
+	flatGr = false;
+
+
+	sdrplay_api_ErrT err;
+
+
+	// Retrieve device parameters so they can be changed if wanted
+	if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams)) != sdrplay_api_Success)
 	{
-		return false;
-	}
-	// Select chosen device
-	if ((err = sdrplay_api_SelectDevice(pDevice)) != sdrplay_api_Success)
-	{
-		printf("sdrplay_api_SelectDevice failed %s\n", sdrplay_api_GetErrorString(err));
+		printf("sdrplay_api_GetDeviceParams failed %s\n", sdrplay_api_GetErrorString(err));
+		throw msg_exception("Error in tuner initialisation.");
 	}
 
-	return true;
+	sdrplay_api_TunerSelectT tuner = pd->tuner;
+	cout << "Tuner " << tuner << " selected";
+
+
+
+	return sdrplay_api_Success;
 }
 
 void sdrplay_device::createCtrlThread(const char* addr, int port)
@@ -169,19 +228,22 @@ void sdrplay_device::createCtrlThread(const char* addr, int port)
 
 void sdrplay_device::start(SOCKET client)
 {
-	// Lock API while device selection is performed
-	sdrplay_api_LockDeviceApi();
-	selectDevice(pargs);
-	// Unlock API now that device is selected
-	sdrplay_api_UnlockDeviceApi();
+	//// Lock API while device selection is performed
+	//sdrplay_api_LockDeviceApi();
+	//selectDevice(0);
+	//// Unlock API now that device is selected
+	//sdrplay_api_UnlockDeviceApi();
 
-	init(pargs);
-	started = true;
-	Sleep(1000);
+	//init(pargs);
+	//Sleep(1000);
+	//remoteClient = client;
+	//writeWelcomeString();
 	remoteClient = client;
-	writeWelcomeString();
 
 	cout << endl << "Starting..." << endl;
+	// create the control thread and its socket communication
+	createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
+
 
 
 	if (thrdRx != 0) // just in case..
@@ -197,6 +259,8 @@ void sdrplay_device::start(SOCKET client)
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	int res = pthread_create(thrdRx, &attr, &receive, this);
 	pthread_attr_destroy(&attr);
+
+	started = true;
 }
 
 
@@ -209,36 +273,36 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 	currentSamplingRateHz = pargs->SamplingRate;
 	bitWidth = (eBitWidth)pargs->BitWidth;
 	//antenna = pargs->Antenna;
-	sdrplay_api_DeviceT* pd = pDevice;
+	//sdrplay_api_DeviceT* pd = pDevice;
 
-	if (pd->hwVer == SDRPLAY_RSP1_ID)
-		rxType = RSP1;
-	else if (pd->hwVer == SDRPLAY_RSP1A_ID)
-		rxType = RSP1A;
-	else if (pd->hwVer == SDRPLAY_RSP2_ID)
-		rxType = RSP2;
-	else if (pd->hwVer == SDRPLAY_RSPduo_ID)
-		rxType = RSPduo;
-	else if (pd->hwVer == SDRPLAY_RSPdx_ID)
-		rxType = RSPdx;
-	else
-		rxType = UNKNOWN;
+	//if (pd->hwVer == SDRPLAY_RSP1_ID)
+	//	rxType = RSP1;
+	//else if (pd->hwVer == SDRPLAY_RSP1A_ID)
+	//	rxType = RSP1A;
+	//else if (pd->hwVer == SDRPLAY_RSP2_ID)
+	//	rxType = RSP2;
+	//else if (pd->hwVer == SDRPLAY_RSPduo_ID)
+	//	rxType = RSPduo;
+	//else if (pd->hwVer == SDRPLAY_RSPdx_ID)
+	//	rxType = RSPdx;
+	//else
+	//	rxType = UNKNOWN;
 
-	flatGr = false;
-
-
-	sdrplay_api_ErrT err;
+	//flatGr = false;
 
 
-	// Retrieve device parameters so they can be changed if wanted
-	if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams))  != sdrplay_api_Success)
-	{
-		printf("sdrplay_api_GetDeviceParams failed %s\n", sdrplay_api_GetErrorString(err));
-		throw msg_exception("Error in tuner initialisation.");
-	}
+	//sdrplay_api_ErrT err;
 
-	sdrplay_api_TunerSelectT tuner = pd->tuner;
-	cout << "Tuner " << tuner << " selected";
+
+	//// Retrieve device parameters so they can be changed if wanted
+	//if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams))  != sdrplay_api_Success)
+	//{
+	//	printf("sdrplay_api_GetDeviceParams failed %s\n", sdrplay_api_GetErrorString(err));
+	//	throw msg_exception("Error in tuner initialisation.");
+	//}
+
+	//sdrplay_api_TunerSelectT tuner = pd->tuner;
+	//cout << "Tuner " << tuner << " selected";
 
 	//{
 	//	switch (pargs->Tuner)
@@ -262,7 +326,7 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 	//	else
 	//		pd->rspDuoMode = sdrplay_api_RspDuoMode_Master;
 	//}
-	createChannels();
+	//createChannels();
 }
 void sdrplay_device::selectChannel(sdrplay_api_TunerSelectT tunerId)
 {
@@ -623,14 +687,14 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	//gainReduction = 40;
 	//LNAstate = 0;
 
-	sdrplay_api_CallbackFnsT cbFns;
 	cbFns.StreamACbFn = streamACallback;
 	cbFns.StreamBCbFn = streamBCallback;
 	cbFns.EventCbFn = eventCallback;
 
 	sdrplay_api_ErrT errInit = sdrplay_api_Init(pDevice->dev, &cbFns, this);
 	cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
-	Initialized = true;
+	if (errInit == sdrplay_api_Success)
+		Initialized = true;
 	//double fs = deviceParams->devParams->fsFreq.fsHz;
 	return errInit;
 }

@@ -179,6 +179,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Source\crc32.cpp" />
     <ClCompile Include="Source\common.cpp" />
     <ClCompile Include="Source\controlThread.cpp" />
     <ClCompile Include="Source\devices.cpp" />
@@ -194,6 +195,7 @@
     <ClCompile Include="Source\receiveThread.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Include\crc32.h" />
     <ClInclude Include="Include\common.h" />
     <ClInclude Include="Include\controlThread.h" />
     <ClInclude Include="Include\devices.h" />

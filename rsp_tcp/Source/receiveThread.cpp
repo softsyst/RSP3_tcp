@@ -24,7 +24,7 @@
 #include <iostream>
 using namespace std;
 
-int getCommandAndValue(char* rxBuf, int& value)
+uint8_t getCommandAndValue(char* rxBuf, int& value)
 {
 	BYTE valbuf[4];
 	int cmd = rxBuf[0];
@@ -51,16 +51,16 @@ void* receive(void* p)
 	{
 		sdrplay_api_ErrT errInit;
 
-		int gain = md->RequestedGain;
-		if (!md->RSPGainValuesFromRequestedGain(gain, md->rxType, md->LNAstate, md->gainReduction))
-		{
-			cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << gain << endl;
-			cout << "Program cannot continue" << endl;
-			return 0;
-		}
-		cout << "\n Using LNA State: " << md->LNAstate << endl;
-		cout << " Using Gain Reduction: " << md->gainReduction << endl;
-		md->createChannels();
+		//int gain = md->RequestedGain;
+		//if (!md->RSPGainValuesFromRequestedGain(gain, md->rxType, md->LNAstate, md->gainReduction))
+		//{
+		//	cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << gain << endl;
+		//	cout << "Program cannot continue" << endl;
+		//	return 0;
+		//}
+		//cout << "\n Using LNA State: " << md->LNAstate << endl;
+		//cout << " Using Gain Reduction: " << md->gainReduction << endl;
+		//md->createChannels();
 	}
 	catch (const std::exception&)
 	{
@@ -70,6 +70,8 @@ void* receive(void* p)
 
 	try
 	{
+		md->writeWelcomeString();
+
 		char rxBuf[16];
 		for (;;)
 		{
@@ -97,12 +99,28 @@ void* receive(void* p)
 			}
 
 			int value = 0; // out parameter
-			int cmd = getCommandAndValue(rxBuf, value);
+			uint8_t cmd = getCommandAndValue(rxBuf, value);
 
 			// The ids of the commands are defined in rtl_tcp, the names had been inserted here
 			// for better readability
+			int gain = md->RequestedGain;
 			switch (cmd)
 			{
+			case sdrplay_device::CMD_SET_RSP_SELECT_SERIAL: //select hardware 
+				md->selectDevice(value);
+				if (!md->RSPGainValuesFromRequestedGain(gain, md->rxType, md->LNAstate, md->gainReduction))
+				{
+					cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << gain << endl;
+					cout << "Program cannot continue" << endl;
+					return 0;
+				}
+				cout << "\n Using LNA State: " << md->LNAstate << endl;
+				cout << " Using Gain Reduction: " << md->gainReduction << endl;
+
+				md->createChannels();
+
+				break;
+				
 			case sdrplay_device::CMD_SET_FREQUENCY: //set frequency
 													  //value is freq in Hz
 				err = md->setFrequency(value);
@@ -130,7 +148,7 @@ void* receive(void* p)
 				break;
 
 			case (int)sdrplay_device::CMD_SET_BIAS_T:
-				err = md->setBiasT(value != 0);
+				//err = md->setBiasT(value != 0);
 				break;
 
 			case (int)sdrplay_device::CMD_SET_RSP2_ANTENNA_CONTROL:

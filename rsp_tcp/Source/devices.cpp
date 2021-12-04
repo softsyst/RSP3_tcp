@@ -157,6 +157,7 @@ void devices::doListen()
 			pd->remoteClient = INVALID_SOCKET;
 			cout << "Socket closed\n\n";
 			delete pd;
+			pd = 0;
 		}
 	}
 	catch (exception& e)
