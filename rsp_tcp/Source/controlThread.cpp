@@ -24,6 +24,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <climits>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -50,7 +51,13 @@
 #pragma comment(lib, "ws2_32.lib")
 
 typedef int socklen_t;
-
+enum eIndications
+{
+	IND_GAIN = 0
+	, IND_LNA_STATE = 0x4b        // 0: most sensitive, 8: least sensitive
+	, IND_SELECT_SERIAL = 0x80    // value is four bytes CRC-32 of the requested serial number
+	, IND_WELCOME = 0x81		  // welcome message
+};
 #else
 #define closesocket close
 #define SOCKADDR struct sockaddr
@@ -58,15 +65,65 @@ typedef int socklen_t;
 #define SOCKET_ERROR -1
 #endif
 
-#define MAX_LEN  256
-#define TX_BUF_LEN (32) //tbd
+#define MAX_LEN  (1024)
+#define TX_BUF_LEN (1024) //tbd
 
 ctrl_thread_data_t ctrl_thread_data;
+unsigned char txbuf[TX_BUF_LEN];
+
+//https://stackoverflow.com/questions/105252/how-do-i-convert-between-big-endian-and-little-endian-values-in-c
+template <typename T>
+void swapEnd(T& var)
+{
+	static_assert(std::is_pod<T>::value, "Type must be POD type for safety");
+	std::array<char, sizeof(T)> varArray;
+	std::memcpy(varArray.data(), &var, sizeof(T));
+	for (int i = 0; i < static_cast<int>(sizeof(var) / 2); i++)
+		std::swap(varArray[sizeof(var) - 1 - i], varArray[i]);
+	std::memcpy(&var, varArray.data(), sizeof(T));
+}
+/// <summary>
+/// Preapres the buffer "ready to send" for an simple indication
+/// </summary>
+/// <param name="indic">Indication</param>
+/// <param name="value">one item</param>
+/// <param name="length">Length of value in bytes</param>
+/// <remark>
+/// One byte indication
+/// Two bytes length, the length of the following value(s)
+int prepareIntCommand(BYTE* tx, int startIx, int indic, int value, uint16_t length )
+{
+	//Big Endian / Network Byte Order
+	int ix = startIx;
+
+	tx[ix++] = (BYTE)(indic & 0xff);
+	txbuf[ix++] = (length >> 8) & 0xff;
+	txbuf[ix++] = length & 0xff;
+	uint16_t val = 0;
+	switch (length)
+	{
+	case 1:
+		tx[ix++] = value & 0xff;
+		break;
+	case 2:
+		val = value & 0xffff;
+		tx[ix++] = (val>>8) & 0xff;
+		tx[ix++] = val & 0xff;
+		break;
+	case 4:
+		tx[ix++] = (value >> 24) & 0xff;
+		tx[ix++] = (value >> 16) & 0xff;
+		tx[ix++] = (value >> 8) & 0xff;
+		tx[ix++] = (value >> 0) & 0xff;
+		break;
+	default:
+		break;
+	}
+	return ix;
+}
 
 void *ctrl_thread_fn(void *arg)
 {
-	unsigned char reg_values[MAX_LEN];
-	unsigned char txbuf[TX_BUF_LEN];
 	int r = 1;
 	struct timeval tv = { 1,0 };
 	struct linger ling = { 1,0 };
@@ -92,7 +149,7 @@ void *ctrl_thread_fn(void *arg)
 	u_long blockmode = 1;
 	int retval;
 
-	memset(reg_values, 0, MAX_LEN);
+	bool welcomeSent = false;
 
 	memset(&local, 0, sizeof(local));
 	local.sin_family = AF_INET;
@@ -135,24 +192,16 @@ void *ctrl_thread_fn(void *arg)
 				haveControlSocket = 1;
 				break;
 			}
-			result = 0;// rtlsdr_get_tuner_i2c_register(dev, reg_values, &len, &total_gain);
-			total_gain = ((total_gain + 5) / 10)%256;
-			if (old_gain != total_gain)
-			{
-				printf("\ngain = %2d dB\r", total_gain);
-				old_gain = total_gain;
-			}
+			result = 0;
 		}
 
 		setsockopt(controlSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
 
 		printf("\nControl client accepted!\n");
-		usleep(5000000);
+		//usleep(5000000);
 
 		while (1) 
 		{
-
-
 			/* @TODO: check if something else has to be transmitted */
 			if (false)
 				goto sleep;
@@ -164,23 +213,17 @@ void *ctrl_thread_fn(void *arg)
 			sdrplay_api_GainValuesT* gvals = dev->getGainValues();
 			if (gvals == 0)	// too early
 				goto sleep;
+			int lnastate = dev->getLNAState();
 
 			float gain = gvals->curr;
 			if (gain > 0)
 				total_gain = (int)(gain * 10.0f);
 
-			memset(txbuf, 0, TX_BUF_LEN);
-			if (result)
-				goto sleep;
+			int len = prepareIntCommand(txbuf, 2, IND_GAIN, total_gain, 2);
+			len     = prepareIntCommand(txbuf, len, IND_LNA_STATE, lnastate, 1);
+			txbuf[0] = (len >> 8) & 0xff;
+			txbuf[1] = len & 0xff;
 
-			//Big Endian / Network Byte Order
-			txbuf[0] = 0;// REPORT_I2C_REGS;
-			txbuf[1] = ((len + 2) >> 8) & 0xff;
-			txbuf[2] = (len + 2) & 0xff;
-			txbuf[3] = (total_gain >> 8) & 0xff;
-			txbuf[4] = total_gain & 0xff;
-
-			len += 5;
 
 			/* now start (possibly blocking) transmission */
 			bytessent = 0;

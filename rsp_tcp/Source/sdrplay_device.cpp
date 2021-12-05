@@ -273,61 +273,8 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 	currentSamplingRateHz = pargs->SamplingRate;
 	bitWidth = (eBitWidth)pargs->BitWidth;
 	//antenna = pargs->Antenna;
-	//sdrplay_api_DeviceT* pd = pDevice;
-
-	//if (pd->hwVer == SDRPLAY_RSP1_ID)
-	//	rxType = RSP1;
-	//else if (pd->hwVer == SDRPLAY_RSP1A_ID)
-	//	rxType = RSP1A;
-	//else if (pd->hwVer == SDRPLAY_RSP2_ID)
-	//	rxType = RSP2;
-	//else if (pd->hwVer == SDRPLAY_RSPduo_ID)
-	//	rxType = RSPduo;
-	//else if (pd->hwVer == SDRPLAY_RSPdx_ID)
-	//	rxType = RSPdx;
-	//else
-	//	rxType = UNKNOWN;
-
-	//flatGr = false;
-
-
-	//sdrplay_api_ErrT err;
-
-
-	//// Retrieve device parameters so they can be changed if wanted
-	//if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams))  != sdrplay_api_Success)
-	//{
-	//	printf("sdrplay_api_GetDeviceParams failed %s\n", sdrplay_api_GetErrorString(err));
-	//	throw msg_exception("Error in tuner initialisation.");
-	//}
-
-	//sdrplay_api_TunerSelectT tuner = pd->tuner;
-	//cout << "Tuner " << tuner << " selected";
-
-	//{
-	//	switch (pargs->Tuner)
-	//	{
-	//		//case 0: pd->tuner = sdrplay_api_Tuner_Nothing; break;
-	//		case 1: pd->tuner = sdrplay_api_Tuner_A; 
-	//			pCurCh = deviceParams->rxChannelA;
-	//			break;
-	//		case 2: pd->tuner = sdrplay_api_Tuner_B; 
-	//			pCurCh = deviceParams->rxChannelB;
-	//			break;
-	//		case 3: pd->tuner = sdrplay_api_Tuner_Both; 
-	//			break; // not suitable to switch tuners
-	//		default: pd->tuner = sdrplay_api_Tuner_A; 
-	//			pCurCh = deviceParams->rxChannelA;
-	//			break;
-	//	}
-	//	if (pargs->Master == 0)
-	//		// Always create two tuners, to be able to switch
-			//pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
-	//	else
-	//		pd->rspDuoMode = sdrplay_api_RspDuoMode_Master;
-	//}
-	//createChannels();
 }
+
 void sdrplay_device::selectChannel(sdrplay_api_TunerSelectT tunerId)
 {
 	if (tunerId == sdrplay_api_Tuner_A)
@@ -960,6 +907,12 @@ sdrplay_api_ErrT sdrplay_device::setLNAState(int value)
 	return err;
 }
 
+int sdrplay_device::getLNAState()
+{
+	if (pCurCh == 0)
+		return -1;
+	return pCurCh->tunerParams.gain.LNAstate;
+}
 
 sdrplay_api_ErrT sdrplay_device::setSamplingRate(int requestedSrHz)
 {

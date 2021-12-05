@@ -70,6 +70,7 @@ void* receive(void* p)
 
 	try
 	{
+		// preliminary
 		md->writeWelcomeString();
 
 		char rxBuf[16];
@@ -106,7 +107,7 @@ void* receive(void* p)
 			int gain = md->RequestedGain;
 			switch (cmd)
 			{
-			case sdrplay_device::CMD_SET_RSP_SELECT_SERIAL: //select hardware 
+			case sdrplay_device::CMD_SET_RSP_SELECT_SERIAL: //select hardware, 1st command to receive
 				md->selectDevice(value);
 				if (!md->RSPGainValuesFromRequestedGain(gain, md->rxType, md->LNAstate, md->gainReduction))
 				{

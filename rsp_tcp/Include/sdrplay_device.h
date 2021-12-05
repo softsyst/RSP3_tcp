@@ -106,7 +106,6 @@ private:
 	friend void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 		sdrplay_api_EventParamsT *params, void *cbContext);
 
-
 public:
 	sdrplay_api_DeviceT* getDevice()
 	{
@@ -121,6 +120,7 @@ public:
 	void stop();
 	void createCtrlThread(const char* addr, int port);
 	sdrplay_api_GainValuesT* getGainValues();
+	int getLNAState();
 
 	pthread_mutex_t mutex_rxThreadStarted;
 	pthread_cond_t started_cond = PTHREAD_COND_INITIALIZER;
