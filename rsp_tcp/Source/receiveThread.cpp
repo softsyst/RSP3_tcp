@@ -49,27 +49,6 @@ void* receive(void* p)
 
 	try
 	{
-		sdrplay_api_ErrT errInit;
-
-		//int gain = md->RequestedGain;
-		//if (!md->RSPGainValuesFromRequestedGain(gain, md->rxType, md->LNAstate, md->gainReduction))
-		//{
-		//	cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << gain << endl;
-		//	cout << "Program cannot continue" << endl;
-		//	return 0;
-		//}
-		//cout << "\n Using LNA State: " << md->LNAstate << endl;
-		//cout << " Using Gain Reduction: " << md->gainReduction << endl;
-		//md->createChannels();
-	}
-	catch (const std::exception&)
-	{
-		cout << " !!!!!!!!! Exception in the initialization !!!!!!!!!!\n";
-		return 0;
-	}
-
-	try
-	{
 		// preliminary
 		md->writeWelcomeString();
 
@@ -104,21 +83,14 @@ void* receive(void* p)
 
 			// The ids of the commands are defined in rtl_tcp, the names had been inserted here
 			// for better readability
-			int gain = md->RequestedGain;
+			//int gain = md->RequestedGain;
 			switch (cmd)
 			{
 			case sdrplay_device::CMD_SET_RSP_SELECT_SERIAL: //select hardware, 1st command to receive
 				md->selectDevice(value);
-				if (!md->RSPGainValuesFromRequestedGain(gain, md->rxType, md->LNAstate, md->gainReduction))
-				{
-					cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << gain << endl;
-					cout << "Program cannot continue" << endl;
-					return 0;
-				}
-				cout << "\n Using LNA State: " << md->LNAstate << endl;
-				cout << " Using Gain Reduction: " << md->gainReduction << endl;
-
 				md->createChannels();
+				if (md->Initialized)
+					md->CommState = ST_DEVICE_CREATED;
 
 				break;
 				
@@ -149,12 +121,13 @@ void* receive(void* p)
 				break;
 
 			case (int)sdrplay_device::CMD_SET_BIAS_T:
-				//err = md->setBiasT(value != 0);
+				err = md->setBiasT(value != 0);
 				break;
 
 			case (int)sdrplay_device::CMD_SET_RSP2_ANTENNA_CONTROL:
 				md->setAntenna(value);
 				break;
+
 			case (int)sdrplay_device::CMD_SET_RSP_LNA_STATE:
 				md->setLNAState(value);
 				break;

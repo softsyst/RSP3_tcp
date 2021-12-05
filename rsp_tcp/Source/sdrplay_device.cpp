@@ -37,6 +37,8 @@ sdrplay_device::~sdrplay_device()
 
 sdrplay_device::sdrplay_device(rsp_cmdLineArgs* args) 
 {
+	CommState = ST_IDLE;
+
 	for (int i = 0; i < MAX_DEVICES; i++)
 	{
 		sdrplayDevices[i].dev = 0;
@@ -65,6 +67,20 @@ sdrplay_device::sdrplay_device(rsp_cmdLineArgs* args)
 	Count1.HighPart = Count2.HighPart = 0;
 #endif
 }
+
+// called in the constructor
+void sdrplay_device::init(rsp_cmdLineArgs* pargs)
+{
+
+	//From the command line
+	currentFrequencyHz = pargs->Frequency;
+	RequestedGain = pargs->Gain;
+	currentSamplingRateHz = pargs->SamplingRate;
+	bitWidth = (eBitWidth)pargs->BitWidth;
+	//antenna = pargs->Antenna;
+}
+
+
 /// <summary>
 /// Collect all sdrplay devices
 /// </summary>
@@ -111,8 +127,8 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 	pDevice = 0;
 	sdrplay_api_DeviceT* pd = 0;
 	// Lock API while device selection is performed
-	collectDevices();
 	sdrplay_api_LockDeviceApi();
+	collectDevices();
 	////if (pargs == 0)
 	//	pargs = args;
 	//sdrplay_api_TunerSelectT tun = (sdrplay_api_TunerSelectT)args->Tuner;
@@ -138,26 +154,50 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 	//}
 	//else
 	{
+		bool master_slave = false;
+
 		for (int i = 0; i < numDevices; i++)
 		{
 			// Pick first if crc == 0
 			pd = &sdrplayDevices[i];
 			string devserno = string(pd->SerNo);
 			if (crc == serialCRCs[i] || crc== 0 )
-			//if (common::hasEnding(devserno, pargs->Serial))
 			{
+				cout << "Device with Serial " << sdrplayDevices[i].SerNo << " selected." << endl;
+				//pd->tuner = sdrplay_api_Tuner_A;
+				setDevice(pd); //pDevice
+				if (pd->hwVer == SDRPLAY_RSPduo_ID)
+				{
+					// If master device is available, select device as master
+					if (pd->rspDuoMode & sdrplay_api_RspDuoMode_Master)
+					{
+						// Select tuner based on user input (or default to TunerA)
+						pd->tuner = sdrplay_api_Tuner_A;
+						//if (reqTuner == 1)
+						//	chosenDevice->tuner = sdrplay_api_Tuner_B;
+						// Set operating mode
+						if (!master_slave) // Single tuner mode
+						{
+							pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+						}
+						else
+						{
+							pd->rspDuoMode = sdrplay_api_RspDuoMode_Master;
+							// Need to specify sample frequency in master/slave mode
+							pd->rspDuoSampleFreq = 6000000.0;
+						}
+					}
+					else // Only slave device available
+					{
+						// Shouldn't change any parameters for slave device
+					}
+				}
 				// Select chosen device
 				if ((err = sdrplay_api_SelectDevice(pd)) != sdrplay_api_Success)
 				{
 					printf("sdrplay_api_SelectDevice failed %s\n", sdrplay_api_GetErrorString(err));
 					break;
 				}
-				cout << "Device with Serial " << sdrplayDevices[i].SerNo << " selected." << endl;
-				pd->tuner = sdrplay_api_Tuner_A;
-				setDevice(pd); //pDevice
-				if (pd->hwVer == SDRPLAY_RSPduo_ID)
-					pd->rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
-
 				DeviceSelected = true;
 				break;
 			}
@@ -165,6 +205,7 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 	}
 	if (pDevice == 0)
 		return sdrplay_api_Fail;
+
 	pd = pDevice;
 	sdrplay_api_UnlockDeviceApi();
 	if (pd->hwVer == SDRPLAY_RSP1_ID)
@@ -193,11 +234,8 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 		throw msg_exception("Error in tuner initialisation.");
 	}
 
-	sdrplay_api_TunerSelectT tuner = pd->tuner;
-	cout << "Tuner " << tuner << " selected";
-
-
-
+	//sdrplay_api_TunerSelectT tuner = pd->tuner;
+	cout << "Tuner " << pd->tuner << " selected";
 	return sdrplay_api_Success;
 }
 
@@ -228,16 +266,6 @@ void sdrplay_device::createCtrlThread(const char* addr, int port)
 
 void sdrplay_device::start(SOCKET client)
 {
-	//// Lock API while device selection is performed
-	//sdrplay_api_LockDeviceApi();
-	//selectDevice(0);
-	//// Unlock API now that device is selected
-	//sdrplay_api_UnlockDeviceApi();
-
-	//init(pargs);
-	//Sleep(1000);
-	//remoteClient = client;
-	//writeWelcomeString();
 	remoteClient = client;
 
 	cout << endl << "Starting..." << endl;
@@ -261,18 +289,6 @@ void sdrplay_device::start(SOCKET client)
 	pthread_attr_destroy(&attr);
 
 	started = true;
-}
-
-
-void sdrplay_device::init(rsp_cmdLineArgs* pargs)
-{
-
-	//From the command line
-	currentFrequencyHz = pargs->Frequency;
-	RequestedGain = pargs->Gain;
-	currentSamplingRateHz = pargs->SamplingRate;
-	bitWidth = (eBitWidth)pargs->BitWidth;
-	//antenna = pargs->Antenna;
 }
 
 void sdrplay_device::selectChannel(sdrplay_api_TunerSelectT tunerId)
@@ -322,11 +338,17 @@ void sdrplay_device::writeWelcomeString() const
 	memset(buf, 0, c_welcomeMessageLength);
 	memcpy(buf, buf0, 4);
 	buf[6] = bitWidth;
-	buf[7] = rxType+6;	//6:RSP1, 7: RSP1A, 8: RSP2
+	buf[7] = rxType+7;	//7:RSP1, 8: RSP1A, 9: RSP2, 10:RSPduo
 	buf[11] = 0;// gainConfiguration::GAIN_STEPS;
 	buf[15] = 0x52; buf[16] = 0x53; buf[17] = 0x50; buf[18] = (int)rxType + 0x30; //"RSP2", interpreted e.g. by qirx
 	send(remoteClient, (const char*)buf, c_welcomeMessageLength, 0);
 	delete[] buf;
+}
+
+int sdrplay_device::getRxString(char* s) const
+{
+	s[3] = (BYTE)rxType + 0x30;
+	return 4;
 }
 
 /// <summary>
@@ -595,9 +617,17 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	//pd->rspDuoSampleFreq = currentSamplingRateHz;
 	selectChannel(sdrplay_api_Tuner_A);
 
+	if (!RSPGainValuesFromRequestedGain(RequestedGain, rxType, LNAstate, gainReduction))
+	{
+		cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << RequestedGain << endl;
+		cout << "Program cannot continue" << endl;
+		return sdrplay_api_Fail;
+	}
+	cout << "\n Using LNA State: " << LNAstate << endl;
+	cout << " Using Gain Reduction: " << gainReduction << endl;
 
 	// next doesn't work in master/slave mode, 
-	pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
+	//pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
 
 	deviceParams->devParams->fsFreq.fsHz = currentSamplingRateHz; // initially set in init
 	int ix = getSamplingConfigurationTableIndex(currentSamplingRateHz);
@@ -630,9 +660,6 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	//deviceParams->rxChannelB->tunerParams.gain.gRdB = gainReduction;
 	//deviceParams->rxChannelB->tunerParams.gain.LNAstate = LNAstate;
 	//deviceParams->rxChannelA->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
-
-	//gainReduction = 40;
-	//LNAstate = 0;
 
 	cbFns.StreamACbFn = streamACallback;
 	cbFns.StreamBCbFn = streamBCallback;
@@ -893,7 +920,6 @@ sdrplay_api_ErrT sdrplay_device::setLNAState(int value)
 		return sdrplay_api_OutOfRange;
 	}
 
-
 	int lnastate = pCurCh->tunerParams.gain.LNAstate;
 	if (value == lnastate)
 		return sdrplay_api_Success;
@@ -1079,13 +1105,13 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 			else if (value == 6) //Tuner B requested
 			{
 				if (pDevice->tuner != sdrplay_api_Tuner_B)
-					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_2);// , sdrplay_api_RspDuo_AMPORT_1);
+					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_1);// , sdrplay_api_RspDuo_AMPORT_1);
 					if (err == sdrplay_api_Success)
 						selectChannel(sdrplay_api_Tuner_B);
 			}
 			break;
 		default:
-			//err = sdrplay_api_InvalidParam;
+			err = sdrplay_api_InvalidParam;
 			break;
 	}
 

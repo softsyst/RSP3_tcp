@@ -53,10 +53,13 @@
 typedef int socklen_t;
 enum eIndications
 {
-	IND_GAIN = 0
-	, IND_LNA_STATE = 0x4b        // 0: most sensitive, 8: least sensitive
-	, IND_SELECT_SERIAL = 0x80    // value is four bytes CRC-32 of the requested serial number
-	, IND_WELCOME = 0x81		  // welcome message
+	  IND_GAIN               = 0
+	, IND_LNA_STATE          = 0x4b         // 0: most sensitive, 8: least sensitive
+	, IND_WELCOME            = 0x80			// response to the requested serial number, and device creation
+	, IND_MAGIC_STRING       = 0x81		    // "RTL0"
+	, IND_RX_STRING          = 0x82		    // "RSPx"
+	, IND_RX_TYPE            = 0x83		    // 1 byte
+	, IND_BIT_WIDTH          = 0x84		    // 1 byte
 };
 #else
 #define closesocket close
@@ -119,6 +122,20 @@ int prepareIntCommand(BYTE* tx, int startIx, int indic, int value, uint16_t leng
 	default:
 		break;
 	}
+	return ix;
+}
+
+int prepareStringCommand(BYTE* tx, int startIx, int indic, char* value, uint16_t length )
+{
+	//Big Endian / Network Byte Order
+	int ix = startIx;
+
+	tx[ix++] = (BYTE)(indic & 0xff);
+	txbuf[ix++] = (length >> 8) & 0xff;
+	txbuf[ix++] = length & 0xff;
+
+	for (int i = 0; i < length; i++)
+		txbuf[ix++] = value[i];
 	return ix;
 }
 
@@ -206,10 +223,33 @@ void *ctrl_thread_fn(void *arg)
 			if (false)
 				goto sleep;
 
-			len = 0;
+			len = 2;
 			total_gain = 123;
 			result = 0;
 			
+			// wait for initial device creation
+			for (int i = 0; i < 10; i++)
+			{
+				if (dev->CommState == ST_WELCOME_SENT)
+					break;
+				if (dev->CommState == ST_DEVICE_CREATED)
+				{
+					len     = prepareStringCommand(txbuf, len, IND_MAGIC_STRING, "RTL0", 4);
+					char s[5];
+					strncpy_s(s, "RSPx", 4); s[4] = 0;
+					int slen = dev->getRxString(s);
+					len     = prepareStringCommand(txbuf, len, IND_RX_STRING, s, slen);
+					len     = prepareIntCommand(txbuf, len, IND_RX_TYPE, dev->getExportedRxType(), 1);
+					len     = prepareIntCommand(txbuf, len, IND_BIT_WIDTH, dev->getBitWidth(), 1);
+					len     = prepareIntCommand(txbuf, len, IND_WELCOME, 1, 1);
+					dev->CommState = ST_WELCOME_SENT;
+					break;
+				}
+				Sleep(1000);
+			}
+			if (dev->CommState != ST_WELCOME_SENT)
+				goto sleep;
+
 			sdrplay_api_GainValuesT* gvals = dev->getGainValues();
 			if (gvals == 0)	// too early
 				goto sleep;
@@ -219,8 +259,9 @@ void *ctrl_thread_fn(void *arg)
 			if (gain > 0)
 				total_gain = (int)(gain * 10.0f);
 
-			int len = prepareIntCommand(txbuf, 2, IND_GAIN, total_gain, 2);
+			len = prepareIntCommand(txbuf, len, IND_GAIN, total_gain, 2);
 			len     = prepareIntCommand(txbuf, len, IND_LNA_STATE, lnastate, 1);
+			
 			txbuf[0] = (len >> 8) & 0xff;
 			txbuf[1] = len & 0xff;
 

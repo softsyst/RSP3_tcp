@@ -34,6 +34,14 @@
 #endif
 using namespace std;
 
+enum eCommState
+{
+	ST_IDLE = 0
+	, ST_DEVICE_CREATED    
+	, ST_WELCOME_SENT 	  
+};
+
+
 static bool VERBOSE = false;
 const int MAX_TUNERS = 2;
 
@@ -106,22 +114,9 @@ private:
 	friend void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 		sdrplay_api_EventParamsT *params, void *cbContext);
 
-public:
-	sdrplay_api_DeviceT* getDevice()
-	{
-		return pDevice;
-	}
-	void setDevice(sdrplay_api_DeviceT* dev)
-	{
-		pDevice = dev;
-	}
-	void init(rsp_cmdLineArgs* pargs);
-	void start(SOCKET client);
-	void stop();
-	void createCtrlThread(const char* addr, int port);
-	sdrplay_api_GainValuesT* getGainValues();
-	int getLNAState();
 
+public:
+	eCommState CommState = ST_IDLE;
 	pthread_mutex_t mutex_rxThreadStarted;
 	pthread_cond_t started_cond = PTHREAD_COND_INITIALIZER;
 	pthread_t* thrdRx;
@@ -133,13 +128,6 @@ public:
 	/// Current values, to be sent to the host
 	/// </summary>
 	sdrplay_api_GainValuesT GainValues;
-
-	/// <summary>
-	/// API: Device Enumeration Structure
-	/// </summary>
-	string serno() { if (pDevice == 0) return "";  return pDevice->SerNo; }		// serial number
-	BYTE hwVer()   { if (pDevice == 0) return 0; return pDevice->hwVer; }
-	int deviceCount() { return numDevices; }
 
 	// HW version
 	HANDLE hdl;         // Handle of the device
@@ -162,6 +150,7 @@ public:
 
 	bool DeviceSelected = false;
 	bool Initialized = false;
+	const int c_welcomeMessageLength = 100;
 
 private:
 	sdrplay_api_DeviceT sdrplayDevices[MAX_DEVICES];
@@ -174,7 +163,6 @@ private:
 	void selectChannel(sdrplay_api_TunerSelectT tunerId);
 	bool collectDevices();
 
-	const int c_welcomeMessageLength = 100;
 	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen);
 	sdrplay_api_ErrT createChannels();
 	sdrplay_api_ErrT setFrequency(int valueHz);
@@ -251,5 +239,32 @@ private:
 	bool cbkTimerStarted = false;
 
 	sdrplay_api_RxChannelParamsT* pCurCh;
+
+public:
+	sdrplay_api_DeviceT* getDevice()
+	{
+		return pDevice;
+	}
+	void setDevice(sdrplay_api_DeviceT* dev)
+	{
+		pDevice = dev;
+	}
+	void init(rsp_cmdLineArgs* pargs);
+	void start(SOCKET client);
+	void stop();
+	void createCtrlThread(const char* addr, int port);
+	sdrplay_api_GainValuesT* getGainValues();
+	int getLNAState();
+	int getRxString(char* s ) const;
+	int getExportedRxType() const { return rxType + 7 ; }
+	int getBitWidth() const { return bitWidth; }
+	int deviceCount() const { return numDevices; }
+
+	/// <summary>
+	/// API: Device Enumeration Structure
+	/// </summary>
+	string serno() { if (pDevice == 0) return "";  return pDevice->SerNo; }		// serial number
+	BYTE hwVer() { if (pDevice == 0) return 0; return pDevice->hwVer; }
+
 };
 
