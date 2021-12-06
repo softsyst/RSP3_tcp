@@ -22,6 +22,7 @@
 #include "sdrGainTable.h"
 #include "crc32.h"
 //#include "MeasTimeDiff.h"
+#include <string.h>
 #include <iostream>
 using namespace std;
 
@@ -121,6 +122,29 @@ bool sdrplay_device::collectDevices()
 	return true;
 }
 
+/// <summary>
+/// Prepares the serials and hwVersion into a list, to be transmitted to the host
+/// Devices must have been collected in advance.
+/// </summary>
+/// <param name="buf">Must be large enough</param>
+/// <returns>Length of the information in the buffer</returns>
+int sdrplay_device::prepareSerialsList(BYTE* buf)
+{
+	cout << "Preparing device serials list." << endl;
+	BYTE* p = buf;
+	const int SERLEN = 64;
+	for (int i = 0; i < numDevices; i++)
+	{
+		for (int k = 0; k < SERLEN; k++)
+			*p++ = sdrplayDevices[i].SerNo[k];
+		*p++ = ',';
+		*p++ = sdrplayDevices[i].hwVer;
+		*p++ = ';';
+	}
+	int len = p - buf;
+	return len;
+}
+
 sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 {
 	DeviceSelected = false;
@@ -208,6 +232,7 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 
 	pd = pDevice;
 	sdrplay_api_UnlockDeviceApi();
+
 	if (pd->hwVer == SDRPLAY_RSP1_ID)
 		rxType = RSP1;
 	else if (pd->hwVer == SDRPLAY_RSP1A_ID)

@@ -53,13 +53,14 @@
 typedef int socklen_t;
 enum eIndications
 {
-	  IND_GAIN               = 0
-	, IND_LNA_STATE          = 0x4b         // 0: most sensitive, 8: least sensitive
-	, IND_WELCOME            = 0x80			// response to the requested serial number, and device creation
-	, IND_MAGIC_STRING       = 0x81		    // "RTL0"
-	, IND_RX_STRING          = 0x82		    // "RSPx"
-	, IND_RX_TYPE            = 0x83		    // 1 byte
-	, IND_BIT_WIDTH          = 0x84		    // 1 byte
+	  IND_GAIN              = 0
+	, IND_LNA_STATE         = 0x4b			  // 0: most sensitive, 8: least sensitive
+	, IND_SERIAL			= 0x80            // A list with all available serial numbers, as a response on CMD_SET_RSP_REQUEST_ALL_SERIALS
+	, IND_WELCOME			= 0x81            // Termination of the initial parameters
+	, IND_MAGIC_STRING		= 0x82            // "RTL0"
+	, IND_RX_STRING			= 0x83            // "RSPx"
+	, IND_RX_TYPE			= 0x84            // 1 byte
+	, IND_BIT_WIDTH			= 0x85            // 1 byte
 };
 #else
 #define closesocket close
@@ -125,7 +126,7 @@ int prepareIntCommand(BYTE* tx, int startIx, int indic, int value, uint16_t leng
 	return ix;
 }
 
-int prepareStringCommand(BYTE* tx, int startIx, int indic, char* value, uint16_t length )
+int prepareStringCommand(BYTE* tx, int startIx, int indic, BYTE* value, uint16_t length )
 {
 	//Big Endian / Network Byte Order
 	int ix = startIx;
@@ -137,6 +138,33 @@ int prepareStringCommand(BYTE* tx, int startIx, int indic, char* value, uint16_t
 	for (int i = 0; i < length; i++)
 		txbuf[ix++] = value[i];
 	return ix;
+}
+
+bool sendBuffer(const SOCKET& socket, void* buf, int len, bool* do_exit)
+{
+	/* now start (possibly blocking) transmission */
+	struct timeval tv = { 1,0 };
+	int bytessent = 0;
+	int bytesleft = len;
+	int index = 0;
+	fd_set writefds;
+
+	while (bytesleft > 0) {
+		FD_ZERO(&writefds);
+		FD_SET(socket, &writefds);
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+		int r = select(socket + 1, NULL, &writefds, NULL, &tv);
+		if (r) {
+			bytessent = send(socket, (const char*)&txbuf[index], bytesleft, 0);
+			bytesleft -= bytessent;
+			index += bytessent;
+		}
+		if (bytessent == SOCKET_ERROR || *do_exit) {
+			return false;
+		}
+	}
+	return true;
 }
 
 void *ctrl_thread_fn(void *arg)
@@ -227,64 +255,93 @@ void *ctrl_thread_fn(void *arg)
 			total_gain = 123;
 			result = 0;
 			
-			// wait for initial device creation
-			for (int i = 0; i < 10; i++)
+			//// wait for initial device creation
+			//for (int i = 0; i < 10; i++)
+			//{
+			//	if (dev->CommState == ST_WELCOME_SENT)
+			//		break;
+			//	else if (dev->CommState == ST_DEVICE_CREATED)
+			//	{
+			//		len     = prepareStringCommand(txbuf, len, IND_MAGIC_STRING, "RTL0", 4);
+			//		char s[5];
+			//		strncpy_s(s, "RSPx", 4); s[4] = 0;
+			//		int slen = dev->getRxString(s);
+			//		len     = prepareStringCommand(txbuf, len, IND_RX_STRING, s, slen);
+			//		len     = prepareIntCommand(txbuf, len, IND_RX_TYPE, dev->getExportedRxType(), 1);
+			//		len     = prepareIntCommand(txbuf, len, IND_BIT_WIDTH, dev->getBitWidth(), 1);
+			//		len     = prepareIntCommand(txbuf, len, IND_WELCOME, 1, 1);
+			//		dev->CommState = ST_WELCOME_SENT;
+			//		break;
+			//	}
+			//	else if (dev->CommState == ST_SERIALS_REQUESTED)
+			//	{
+			//		dev->collectDevices();
+			//		char tmp[1024];
+			//		int buflen = dev->prepareSerialsList(tmp);
+			//		len = prepareStringCommand(txbuf, len, IND_SERIAL, tmp, buflen);
+			//		break;
+			//	}
+			//	Sleep(1000);
+			//}
+			//if (dev->CommState != ST_WELCOME_SENT)
+			//	goto sleep;
+
+			sdrplay_api_GainValuesT* gvals = 0;
+			float gain = 0;
+			int lnastate = 0;
+			int buflen = 0;
+
+			switch (dev->CommState)
 			{
-				if (dev->CommState == ST_WELCOME_SENT)
-					break;
-				if (dev->CommState == ST_DEVICE_CREATED)
-				{
-					len     = prepareStringCommand(txbuf, len, IND_MAGIC_STRING, "RTL0", 4);
-					char s[5];
-					strncpy_s(s, "RSPx", 4); s[4] = 0;
-					int slen = dev->getRxString(s);
-					len     = prepareStringCommand(txbuf, len, IND_RX_STRING, s, slen);
-					len     = prepareIntCommand(txbuf, len, IND_RX_TYPE, dev->getExportedRxType(), 1);
-					len     = prepareIntCommand(txbuf, len, IND_BIT_WIDTH, dev->getBitWidth(), 1);
-					len     = prepareIntCommand(txbuf, len, IND_WELCOME, 1, 1);
-					dev->CommState = ST_WELCOME_SENT;
-					break;
-				}
-				Sleep(1000);
-			}
-			if (dev->CommState != ST_WELCOME_SENT)
+			case ST_IDLE:
 				goto sleep;
 
-			sdrplay_api_GainValuesT* gvals = dev->getGainValues();
-			if (gvals == 0)	// too early
-				goto sleep;
-			int lnastate = dev->getLNAState();
+			case ST_SERIALS_REQUESTED:
+				dev->collectDevices();
+				BYTE tmp[1024];
+				buflen = dev->prepareSerialsList(tmp);
+				len = prepareStringCommand(txbuf, len, IND_SERIAL, tmp, buflen);
 
-			float gain = gvals->curr;
-			if (gain > 0)
-				total_gain = (int)(gain * 10.0f);
+				txbuf[0] = (len >> 8) & 0xff;
+				txbuf[1] = len & 0xff;
+				dev->CommState = ST_IDLE; // wait for the next command changing the state
+				break;
 
-			len = prepareIntCommand(txbuf, len, IND_GAIN, total_gain, 2);
-			len     = prepareIntCommand(txbuf, len, IND_LNA_STATE, lnastate, 1);
+			case ST_DEVICE_CREATED:
+				len = prepareStringCommand(txbuf, len, IND_MAGIC_STRING, (BYTE*)"RTL0", 4);
+				char s[5];
+				strncpy_s(s, "RSPx", 4); s[4] = 0;
+				buflen = dev->getRxString(s);
+				len = prepareStringCommand(txbuf, len, IND_RX_STRING, (BYTE*)s, buflen);
+				len = prepareIntCommand(txbuf, len, IND_RX_TYPE, dev->getExportedRxType(), 1);
+				len = prepareIntCommand(txbuf, len, IND_BIT_WIDTH, dev->getBitWidth(), 1);
+				len = prepareIntCommand(txbuf, len, IND_WELCOME, 1, 1);
+				dev->CommState = ST_WELCOME_SENT;
+				//fall through
+			case ST_WELCOME_SENT:
+				gvals = dev->getGainValues();
+				if (gvals == 0)	// too early
+					goto sleep;
+				lnastate = dev->getLNAState();
+
+				gain = gvals->curr;
+				if (gain > 0)
+					total_gain = (int)(gain * 10.0f);
+
+				len = prepareIntCommand(txbuf, len, IND_GAIN, total_gain, 2);
+				len = prepareIntCommand(txbuf, len, IND_LNA_STATE, lnastate, 1);
 			
-			txbuf[0] = (len >> 8) & 0xff;
-			txbuf[1] = len & 0xff;
+				txbuf[0] = (len >> 8) & 0xff;
+				txbuf[1] = len & 0xff;
+				break;
+			default:
+				goto sleep;
+				break;
 
-
-			/* now start (possibly blocking) transmission */
-			bytessent = 0;
-			bytesleft = len;
-			index = 0;
-			while (bytesleft > 0) {
-				FD_ZERO(&writefds);
-				FD_SET(controlSocket, &writefds);
-				tv.tv_sec = 1;
-				tv.tv_usec = 0;
-				r = select(controlSocket + 1, NULL, &writefds, NULL, &tv);
-				if (r) {
-					bytessent = send(controlSocket, (const char*)&txbuf[index], bytesleft, 0);
-					bytesleft -= bytessent;
-					index += bytessent;
-				}
-				if (bytessent == SOCKET_ERROR || *do_exit) {
-					goto close;
-				}
 			}
+
+			if (!sendBuffer(controlSocket, txbuf, len, do_exit))
+				goto close;
 		sleep:
 			usleep(wait);
 		}

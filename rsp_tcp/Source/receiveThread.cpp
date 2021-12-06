@@ -86,6 +86,10 @@ void* receive(void* p)
 			//int gain = md->RequestedGain;
 			switch (cmd)
 			{
+			case sdrplay_device::CMD_SET_RSP_REQUEST_ALL_SERIALS: //select hardware, 1st command to receive
+				md->CommState = ST_SERIALS_REQUESTED;
+				break;
+				
 			case sdrplay_device::CMD_SET_RSP_SELECT_SERIAL: //select hardware, 1st command to receive
 				md->selectDevice(value);
 				md->createChannels();

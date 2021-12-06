@@ -37,6 +37,7 @@ using namespace std;
 enum eCommState
 {
 	ST_IDLE = 0
+	, ST_SERIALS_REQUESTED    
 	, ST_DEVICE_CREATED    
 	, ST_WELCOME_SENT 	  
 };
@@ -161,7 +162,6 @@ private:
 	//bool selectDevice(rsp_cmdLineArgs* args);
 	sdrplay_api_ErrT  selectDevice(uint32_t crc);
 	void selectChannel(sdrplay_api_TunerSelectT tunerId);
-	bool collectDevices();
 
 	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen);
 	sdrplay_api_ErrT createChannels();
@@ -194,7 +194,8 @@ private:
 		, CMD_SET_RSP2_ANTENNA_CONTROL = 33   //int Antenna Select
 		, CMD_SET_FREQUENCYCORRECTION_PPM100 = 0x4a            // int ppm*100
 		, CMD_SET_RSP_LNA_STATE = 0x4b        // 0: most sensitive, 8: least sensitive
-		, CMD_SET_RSP_SELECT_SERIAL = 0x80    // value is four bytes CRC-32 of the requested serial number
+		, CMD_SET_RSP_REQUEST_ALL_SERIALS = 0x80      // request for all serials to be transmitted via back channel
+		, CMD_SET_RSP_SELECT_SERIAL = 0x81    // value is four bytes CRC-32 of the requested serial number
 	};
 
 	// This server is able to stream native 16-bit data (of "short" type)
@@ -249,6 +250,8 @@ public:
 	{
 		pDevice = dev;
 	}
+	bool collectDevices();	// called from the controlThread, on clients request
+	int prepareSerialsList(BYTE* buf);
 	void init(rsp_cmdLineArgs* pargs);
 	void start(SOCKET client);
 	void stop();
