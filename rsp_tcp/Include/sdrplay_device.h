@@ -40,6 +40,7 @@ enum eCommState
 	, ST_SERIALS_REQUESTED    
 	, ST_DEVICE_CREATED    
 	, ST_WELCOME_SENT 	  
+	, ST_DEVICE_RELEASED 	  
 };
 
 
@@ -136,14 +137,13 @@ public:
 	bool isStreaming;
 	bool flatGr;		// true: dont use the gain reduction tables
 	int LNAstate;		// Calculated from the RequestedGain
-	//bool overloadDetected_A = false; // overload on tuner A
-	//bool overloadDetected_B = false; // overload on tuner B
-	//bool overloadCorrected_A = false; // overload on tuner A
-	//bool overloadCorrected_B = false; // overload on tuner B
+
 	bool overloaded_A = false;
 	bool overloaded_B = false;
+
 	bool AGC_A = false;
 	bool AGC_B = false;
+
 	int RequestedGain; // the gain requested from the user, NOT the gain reduction used by the RSP
 	bool started = false;
 	//The socket of the remote app
@@ -268,6 +268,11 @@ public:
 	/// </summary>
 	string serno() { if (pDevice == 0) return "";  return pDevice->SerNo; }		// serial number
 	BYTE hwVer() { if (pDevice == 0) return 0; return pDevice->hwVer; }
+
+	void getOverload(bool& overload_a, bool& overload_b) {
+		overload_a = overloaded_A;
+		overload_b = overloaded_B;
+	}
 
 };
 

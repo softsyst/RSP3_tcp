@@ -48,7 +48,7 @@ sdrplay_api_DeviceT *chosenDevice = NULL;
 
 // V0.9.8	Sampling rate 2.000 for ADS-B
 // V0.9.9	Bitwidth 8 Bit corrected
-string Version = "0.3.1";
+string Version = "0.3.1a";
 
 map<eErrors, string> returnErrorStrings =
 {
@@ -213,9 +213,9 @@ exit:
 		std::cout << sError << endl;
 		std::cout << "Application cannot continue. \n" << endl;
 		sdrplay_api_UnlockDeviceApi();
-close:		sdrplay_api_Close();
-		//cout << "Please press any character to exit here..." << endl;
-		//getchar();
+	close:		
+		std::cout << "Application closing. \n" << endl;
+		sdrplay_api_Close();
 	}
 #ifdef _WIN32
 	WSACleanup();

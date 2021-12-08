@@ -131,7 +131,7 @@ void devices::doListen()
 		{
 			sdrplay_device* pd = new sdrplay_device(pargs);
 			if (pd == 0)
-				return;
+				throw "Cannot create device";
 
 
 			cout << "Listening to " << pargs->Address.sIPAddress << ":" << to_string(pargs->Port) << endl;
@@ -162,8 +162,9 @@ void devices::doListen()
 	}
 	catch (exception& e)
 	{
-		cout << "Error starting listener: " << e.what();
+		cout << "*** Error starting listener: " << e.what() << endl;
 	}
+	cout << "*** Exiting listening loop" << endl;
 	/**/
 }
 

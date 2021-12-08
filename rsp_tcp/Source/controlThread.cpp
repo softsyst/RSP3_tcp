@@ -61,6 +61,9 @@ enum eIndications
 	, IND_RX_STRING			= 0x83            // "RSPx"
 	, IND_RX_TYPE			= 0x84            // 1 byte
 	, IND_BIT_WIDTH			= 0x85            // 1 byte
+	, IND_OVERLOAD_A		= 0x86            // 1 byte, 1 == overload
+	, IND_OVERLOAD_B		= 0x87            // 1 byte
+	, IND_DEVICE_RELEASED	= 0x88            // 1 byte
 };
 #else
 #define closesocket close
@@ -243,7 +246,6 @@ void *ctrl_thread_fn(void *arg)
 		setsockopt(controlSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
 
 		printf("\nControl client accepted!\n");
-		//usleep(5000000);
 
 		while (1) 
 		{
@@ -255,40 +257,10 @@ void *ctrl_thread_fn(void *arg)
 			total_gain = 123;
 			result = 0;
 			
-			//// wait for initial device creation
-			//for (int i = 0; i < 10; i++)
-			//{
-			//	if (dev->CommState == ST_WELCOME_SENT)
-			//		break;
-			//	else if (dev->CommState == ST_DEVICE_CREATED)
-			//	{
-			//		len     = prepareStringCommand(txbuf, len, IND_MAGIC_STRING, "RTL0", 4);
-			//		char s[5];
-			//		strncpy_s(s, "RSPx", 4); s[4] = 0;
-			//		int slen = dev->getRxString(s);
-			//		len     = prepareStringCommand(txbuf, len, IND_RX_STRING, s, slen);
-			//		len     = prepareIntCommand(txbuf, len, IND_RX_TYPE, dev->getExportedRxType(), 1);
-			//		len     = prepareIntCommand(txbuf, len, IND_BIT_WIDTH, dev->getBitWidth(), 1);
-			//		len     = prepareIntCommand(txbuf, len, IND_WELCOME, 1, 1);
-			//		dev->CommState = ST_WELCOME_SENT;
-			//		break;
-			//	}
-			//	else if (dev->CommState == ST_SERIALS_REQUESTED)
-			//	{
-			//		dev->collectDevices();
-			//		char tmp[1024];
-			//		int buflen = dev->prepareSerialsList(tmp);
-			//		len = prepareStringCommand(txbuf, len, IND_SERIAL, tmp, buflen);
-			//		break;
-			//	}
-			//	Sleep(1000);
-			//}
-			//if (dev->CommState != ST_WELCOME_SENT)
-			//	goto sleep;
-
 			sdrplay_api_GainValuesT* gvals = 0;
 			float gain = 0;
 			int lnastate = 0;
+			bool overload_a = false, overload_b = false;
 			int buflen = 0;
 
 			switch (dev->CommState)
@@ -296,14 +268,16 @@ void *ctrl_thread_fn(void *arg)
 			case ST_IDLE:
 				goto sleep;
 
+			case ST_DEVICE_RELEASED:
+				len = prepareIntCommand(txbuf, len, IND_DEVICE_RELEASED, 1, 1);
+				dev->CommState = ST_IDLE; // wait for socket to close
+				break;
+
 			case ST_SERIALS_REQUESTED:
 				dev->collectDevices();
 				BYTE tmp[1024];
 				buflen = dev->prepareSerialsList(tmp);
 				len = prepareStringCommand(txbuf, len, IND_SERIAL, tmp, buflen);
-
-				txbuf[0] = (len >> 8) & 0xff;
-				txbuf[1] = len & 0xff;
 				dev->CommState = ST_IDLE; // wait for the next command changing the state
 				break;
 
@@ -330,15 +304,18 @@ void *ctrl_thread_fn(void *arg)
 
 				len = prepareIntCommand(txbuf, len, IND_GAIN, total_gain, 2);
 				len = prepareIntCommand(txbuf, len, IND_LNA_STATE, lnastate, 1);
+
+				dev->getOverload(overload_a, overload_b);
+				len = prepareIntCommand(txbuf, len, IND_OVERLOAD_A, overload_a ? 1 : 0, 1);
+				len = prepareIntCommand(txbuf, len, IND_OVERLOAD_B, overload_b ? 1 : 0, 1);
 			
-				txbuf[0] = (len >> 8) & 0xff;
-				txbuf[1] = len & 0xff;
 				break;
 			default:
 				goto sleep;
 				break;
-
 			}
+			txbuf[0] = (len >> 8) & 0xff;
+			txbuf[1] = len & 0xff;
 
 			if (!sendBuffer(controlSocket, txbuf, len, do_exit))
 				goto close;

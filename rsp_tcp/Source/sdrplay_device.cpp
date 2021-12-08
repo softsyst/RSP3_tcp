@@ -251,7 +251,6 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 
 	sdrplay_api_ErrT err;
 
-
 	// Retrieve device parameters so they can be changed if wanted
 	if ((err = sdrplay_api_GetDeviceParams(pd->dev, &deviceParams)) != sdrplay_api_Success)
 	{
@@ -259,7 +258,6 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 		throw msg_exception("Error in tuner initialisation.");
 	}
 
-	//sdrplay_api_TunerSelectT tuner = pd->tuner;
 	cout << "Tuner " << pd->tuner << " selected";
 	return sdrplay_api_Success;
 }

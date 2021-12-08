@@ -86,20 +86,21 @@ void* receive(void* p)
 			//int gain = md->RequestedGain;
 			switch (cmd)
 			{
+				// First comman
 			case sdrplay_device::CMD_SET_RSP_REQUEST_ALL_SERIALS: //select hardware, 1st command to receive
 				md->CommState = ST_SERIALS_REQUESTED;
 				break;
-				
+
+				// Second command
 			case sdrplay_device::CMD_SET_RSP_SELECT_SERIAL: //select hardware, 1st command to receive
 				md->selectDevice(value);
 				md->createChannels();
 				if (md->Initialized)
 					md->CommState = ST_DEVICE_CREATED;
-
 				break;
-				
+
 			case sdrplay_device::CMD_SET_FREQUENCY: //set frequency
-													  //value is freq in Hz
+													//value is freq in Hz
 				err = md->setFrequency(value);
 				break;
 
@@ -154,7 +155,11 @@ void* receive(void* p)
 	}
 	err = sdrplay_api_ReleaseDevice(md->pDevice);
 	if (err == sdrplay_api_Success)
+	{
 		cout << "Device released" << endl;
+		md->CommState = ST_DEVICE_RELEASED;
+		usleep(1500000);
+	}
 	else
 		cout << "*** Error on releasing device: " << sdrplay_api_GetErrorString(err) << endl;
 
