@@ -18,9 +18,9 @@
 **
 **/
 //#define TIME_MEAS
+#include "devices.h"
 #include "sdrplay_device.h"
 #include "sdrGainTable.h"
-#include "crc32.h"
 //#include "MeasTimeDiff.h"
 #include <string.h>
 #include <iostream>
@@ -34,35 +34,23 @@ sdrplay_device::~sdrplay_device()
 {
 	pthread_mutex_destroy(&mutex_rxThreadStarted);
 	pthread_cond_destroy(&started_cond);
-	delete _crc32;
 }
 
 sdrplay_device::sdrplay_device(rsp_cmdLineArgs* args) 
 {
+	devices::instance().collectDevices();
+	numDevices = devices::instance().getNumDevices();
+	serialCRCs = devices::instance().getSerialCRCs();
+	sdrplayDevices = devices::instance().getSdrplayDevices();
+
 	CommState = ST_IDLE;
-
-	for (int i = 0; i < MAX_DEVICES; i++)
-	{
-		sdrplayDevices[i].dev = 0;
-		memset(&sdrplayDevices[i].SerNo, 0, 64);
-		sdrplayDevices[i].valid = 0;
-		sdrplayDevices[i].hwVer = 999;
-		sdrplayDevices[i].tuner = sdrplay_api_Tuner_Neither;
-
-		serialCRCs[i] = 0;
-	}
-	_crc32 = new crc32(0xffffffff, true, 0xedb88320);
 
 	pargs = args;
 	init(pargs);
 
 	thrdRx = 0;
-	numDevices = 0;
 	pthread_mutex_init(&mutex_rxThreadStarted, NULL);
 	pthread_cond_init(&started_cond, NULL);
-
-	//// create the control thread and its socket communication
-	//createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
 
 #ifdef TIME_MEAS
 	Count1.LowPart = Count2.LowPart = 0;
@@ -73,7 +61,6 @@ sdrplay_device::sdrplay_device(rsp_cmdLineArgs* args)
 // called in the constructor
 void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 {
-
 	//From the command line
 	currentFrequencyHz = pargs->Frequency;
 	RequestedGain = pargs->Gain;
@@ -84,46 +71,6 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 
 
 /// <summary>
-/// Collect all sdrplay devices
-/// </summary>
-/// <returns></returns>
-bool sdrplay_device::collectDevices()
-{
-	try
-	{
-		{
-			sdrplay_api_ErrT err;
-			err = sdrplay_api_GetDevices(sdrplayDevices, (unsigned int*)&numDevices, MAX_DEVICES);
-			if (numDevices == 0)
-				return false;
-
-			int ierr = (int)err;
-			string error = "sdrplay_api_GetDevices failed with error :" + to_string(ierr);
-			cout << "sdrplay_api_GetDevices returned with: " << err << endl;
-			for (int i = 0; i < numDevices; i++)
-			{
-				if (err != sdrplay_api_Success)
-					throw msg_exception(error.c_str());
-
-				if ((sdrplayDevices[i].hwVer < 1 || sdrplayDevices[i].hwVer > 3) &&
-					sdrplayDevices[i].hwVer != 255)
-				{
-					printf("Unknown Hardware version %d .\n", sdrplayDevices[i].hwVer);
-					continue;
-				}
-				serialCRCs[i] = _crc32->calcCrcVal((uint8_t*)sdrplayDevices[i].SerNo, 64);
-			}
-		}
-	}
-	catch (exception& e)
-	{
-		cout << "Error reading devices: " << e.what() << endl;
-		return false;
-	}
-	return true;
-}
-
-/// <summary>
 /// Prepares the serials and hwVersion into a list, to be transmitted to the host
 /// Devices must have been collected in advance.
 /// </summary>
@@ -131,6 +78,11 @@ bool sdrplay_device::collectDevices()
 /// <returns>Length of the information in the buffer</returns>
 int sdrplay_device::prepareSerialsList(BYTE* buf)
 {
+	devices::instance().collectDevices();
+	numDevices = devices::instance().getNumDevices();
+	serialCRCs = devices::instance().getSerialCRCs();
+	sdrplayDevices = devices::instance().getSdrplayDevices();
+
 	cout << "Preparing device serials list." << endl;
 	BYTE* p = buf;
 	const int SERLEN = 64;
@@ -153,7 +105,7 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 	sdrplay_api_DeviceT* pd = 0;
 	// Lock API while device selection is performed
 	sdrplay_api_LockDeviceApi();
-	collectDevices();
+	//collectDevices();
 	////if (pargs == 0)
 	//	pargs = args;
 	//sdrplay_api_TunerSelectT tun = (sdrplay_api_TunerSelectT)args->Tuner;
@@ -540,6 +492,7 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 		break;
 	case sdrplay_api_DeviceRemoved:
 		printf("sdrplay_api_EventCb: %s\n", "sdrplay_api_DeviceRemoved");
+		devices::instance().CloseClient();
 		break;
 	default:
 		printf("sdrplay_api_EventCb: %d, unknown event\n", eventId);

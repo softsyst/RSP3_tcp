@@ -84,7 +84,6 @@ typedef struct
 }
 ctrl_thread_data_t;
 void *ctrl_thread_fn(void *arg);
-class crc32;
 
 class sdrplay_device
 {
@@ -95,7 +94,6 @@ public:
 
 private:
 	sdrplay_device() {}
-	crc32* _crc32;
 
 	int getSamplingConfigurationTableIndex(int requestedSrHz);
 	void writeWelcomeString() const;
@@ -155,8 +153,8 @@ public:
 	const int c_welcomeMessageLength = 100;
 
 private:
-	sdrplay_api_DeviceT sdrplayDevices[MAX_DEVICES];
-	uint32_t serialCRCs[MAX_DEVICES];
+	sdrplay_api_DeviceT* sdrplayDevices;
+	uint32_t* serialCRCs;
 	int numDevices;
 
 	bool RSPGainValuesFromRequestedGain(int flatValue, int rxtype, int& LNAstate, int& gr);
@@ -251,7 +249,7 @@ public:
 	{
 		pDevice = dev;
 	}
-	bool collectDevices();	// called from the controlThread, on clients request
+	//bool collectDevices();	// called from the controlThread, on clients request
 	int prepareSerialsList(BYTE* buf);
 	void init(rsp_cmdLineArgs* pargs);
 	void start(SOCKET client);

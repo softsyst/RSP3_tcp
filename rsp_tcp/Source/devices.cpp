@@ -23,6 +23,7 @@
 #include <thread>
 #include "common.h"
 #include "devices.h"
+#include "crc32.h"
 #ifndef _WIN32
 #include <netdb.h>
 #endif
@@ -30,35 +31,47 @@
 using namespace std;
 static rsp_cmdLineArgs* pargs = 0;
 extern bool exitRequest;
+
 /// <summary>
 /// Collect all sdrplay devices
 /// </summary>
 /// <returns></returns>
-bool devices::getDevices()
+bool devices::collectDevices()
 {
 	try
 	{
+		for (int i = 0; i < MAX_DEVICES; i++)
 		{
-			sdrplay_api_ErrT err;
-			err = sdrplay_api_GetDevices(sdrplayDevices, (unsigned int*)&numDevices, MAX_DEVICES);
-			if (numDevices == 0)
-				return false;
+			sdrplayDevices[i].dev = 0;
+			memset(&sdrplayDevices[i].SerNo, 0, 64);
+			sdrplayDevices[i].valid = 0;
+			sdrplayDevices[i].hwVer = 999;
+			sdrplayDevices[i].tuner = sdrplay_api_Tuner_Neither;
 
-			int ierr = (int)err;
-			string error = "sdrplay_api_GetDevices failed with error :" + to_string(ierr);
-			cout << "sdrplay_api_GetDevices returned with: " << err << endl;
-			for (int i = 0; i < numDevices; i++)
+			serialCRCs[i] = 0;
+		}
+		_crc32 = new crc32(0xffffffff, true, 0xedb88320);
+
+		sdrplay_api_ErrT err;
+		err = sdrplay_api_GetDevices(sdrplayDevices, (unsigned int*)&numDevices, MAX_DEVICES);
+		if (numDevices == 0)
+			return false;
+
+		int ierr = (int)err;
+		string error = "sdrplay_api_GetDevices failed with error :" + to_string(ierr);
+		cout << "sdrplay_api_GetDevices returned with: " << err << endl;
+		for (int i = 0; i < numDevices; i++)
+		{
+			if (err != sdrplay_api_Success)
+				throw msg_exception(error.c_str());
+
+			if ((sdrplayDevices[i].hwVer < 1 || sdrplayDevices[i].hwVer > 3) &&
+				sdrplayDevices[i].hwVer != 255)
 			{
-				if (err != sdrplay_api_Success)
-					throw msg_exception(error.c_str());
-
-				if ((sdrplayDevices[i].hwVer < 1 || sdrplayDevices[i].hwVer > 4) &&
-					sdrplayDevices[i].hwVer != 255)
-				{
-					printf("Unknown Hardware version %d .\n", sdrplayDevices[i].hwVer);
-					continue;
-				}
+				printf("Unknown Hardware version %d .\n", sdrplayDevices[i].hwVer);
+				continue;
 			}
+			serialCRCs[i] = _crc32->calcCrcVal((uint8_t*)sdrplayDevices[i].SerNo, 64);
 		}
 	}
 	catch (exception& e)
@@ -94,12 +107,25 @@ void devices::Stop()
 	{
 		closesocket(clientSocket);
 		closesocket(listenSocket);
-		Sleep(2000); // let the controlThread terminate
 		if (pd != 0 )
 		{
 			pd->ctrlThreadExitFlag = true;
 		}
+		Sleep(2000); // let the controlThread terminate
+		delete _crc32;
 		exit(-5);
+	}
+	catch (const std::exception& e)
+	{
+		cout << "Exception when stopping: " << e.what() << endl;
+	}
+}
+void devices::CloseClient()
+{
+	try
+	{
+		closesocket(clientSocket);
+		Sleep(2000); // let the controlThread terminate
 	}
 	catch (const std::exception& e)
 	{
@@ -165,7 +191,7 @@ void devices::doListen()
 			void* status;
 			pthread_join(*pd->thrdRx, &status);
 			cout << endl << "++++ Rx thread terminated ++++" << endl;
-			delete pd->thrdRx;
+			//delete pd->thrdRx;
 			pd->thrdRx = 0;
 			pd->stop();
 

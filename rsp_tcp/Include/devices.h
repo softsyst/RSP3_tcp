@@ -23,12 +23,11 @@
 #pragma warning(disable:4996)
 #endif
 #include <map>
-//#include "rsp_tcp.h"
-//#include "common.h"
-//#include "IPAddress.h"
 #include "sdrplay_device.h"
 #include "sdrplay_api.h"
 #include "rsp_cmdLineArgs.h"
+
+class crc32;
 
 class devices
 {
@@ -55,14 +54,16 @@ public:
 	sdrplay_api_DeviceT sdrplayDevices[MAX_DEVICES];
 	int numDevices;
 
-	bool SelectDevice(rsp_cmdLineArgs*  pargs);
-
 	sdrplay_device* SelectedDevice;
 
 	void Start(rsp_cmdLineArgs*  pargs);
 	void Stop();
-	bool getDevices() ;
+	void CloseClient();
+	bool collectDevices();
 
+	int getNumDevices() { return numDevices; }
+	uint32_t* getSerialCRCs() { return &serialCRCs[0]; }
+	sdrplay_api_DeviceT* getSdrplayDevices() { return &sdrplayDevices[0]; }
 private:
 	void initListener();
 	void doListen();
@@ -82,6 +83,8 @@ private:
     IPAddress  listenerAddress = IPAddress(0,0,0,0);
 	int listenerPort = 7890;
 	sdrplay_device* pd = 0;
+	crc32* _crc32 = 0;
+	uint32_t serialCRCs[MAX_DEVICES];
 
 public:
 

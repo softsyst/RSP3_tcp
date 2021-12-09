@@ -71,6 +71,7 @@ enum eIndications
 #define SOCKET int
 #define SOCKET_ERROR -1
 #endif
+extern pthread_mutex_t stateLock;
 
 #define MAX_LEN  (1024)
 #define TX_BUF_LEN (1024) //tbd
@@ -259,6 +260,8 @@ void *ctrl_thread_fn(void *arg)
 			bool overload_a = false, overload_b = false;
 			int buflen = 0;
 
+			pthread_mutex_lock(&stateLock);
+
 			switch (dev->CommState)
 			{
 			case ST_IDLE:
@@ -269,8 +272,7 @@ void *ctrl_thread_fn(void *arg)
 				dev->CommState = ST_IDLE; // wait for socket to close
 				break;
 
-			case ST_SERIALS_REQUESTED:
-				dev->collectDevices();
+			case ST_SERIALS_REQUESTED: // 1st command
 				BYTE tmp[1024];
 				buflen = dev->prepareSerialsList(tmp);
 				len = prepareStringCommand(txbuf, len, IND_SERIAL, tmp, buflen);
@@ -316,6 +318,8 @@ void *ctrl_thread_fn(void *arg)
 			if (!sendBuffer(controlSocket, txbuf, len, do_exit))
 				break;
 		sleep:
+			pthread_mutex_unlock(&stateLock);
+
 			if (*do_exit)
 				break;
 			usleep(wait);

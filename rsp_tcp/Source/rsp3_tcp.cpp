@@ -47,6 +47,7 @@ using namespace std;
 string Version = "0.3.1b";
 
 bool exitRequest = false;
+pthread_mutex_t stateLock;
 
 map<eErrors, string> returnErrorStrings =
 {
@@ -125,6 +126,8 @@ int main(int argc, char* argv[])
 
 	std::cout << "\nStarting sdrplay...\n";
 
+	pthread_mutex_init(&stateLock, NULL);
+
 	gainConfiguration::createGainConfigTables();
 
 	// Open API
@@ -173,7 +176,7 @@ int main(int argc, char* argv[])
 	}
 
 	unsigned int numDevices = 0;
-	bool res = devices::instance().getDevices();
+	bool res = devices::instance().collectDevices();
 	if (res)
 	{
 		std::cout << devices::instance().numDevices << " Device(s) found\n";
@@ -205,6 +208,8 @@ exit:
 #ifdef _WIN32
 	WSACleanup();
 #endif
+	pthread_mutex_destroy(&stateLock);
+
 	return retCode;
 
 }

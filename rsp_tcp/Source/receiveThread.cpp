@@ -24,6 +24,8 @@
 #include <iostream>
 using namespace std;
 
+extern pthread_mutex_t stateLock;
+
 uint8_t getCommandAndValue(char* rxBuf, int& value)
 {
 	BYTE valbuf[4];
@@ -126,8 +128,8 @@ void* receive(void* p)
 				break;
 
 			case (int)sdrplay_device::CMD_SET_BIAS_T:
-				//err = md->setBiasT(value != 0);
-				err = md->setAdsbMode();
+				err = md->setBiasT(value != 0);
+				//err = md->setAdsbMode();
 				break;
 
 			case (int)sdrplay_device::CMD_SET_RSP2_ANTENNA_CONTROL:
@@ -147,13 +149,9 @@ void* receive(void* p)
 	catch (exception& e)
 	{
 		cout << "*** Error in receive :" << e.what() << endl;
-		//err = sdrplay_api_StreamUninit();
-		//cout << "sdrplay_api_StreamUninit returned with: " << err << endl;
-		//if (err == sdrplay_api_Success)
-		//	cout << "StreamUnInit successful(0)" << endl;
-		//else
-		//	cout << "StreamUnInit failed (1) with " << err << endl;
 	}
+	pthread_mutex_lock(&stateLock);
+
 	err = sdrplay_api_ReleaseDevice(md->pDevice);
 	if (err == sdrplay_api_Success)
 	{
@@ -163,6 +161,7 @@ void* receive(void* p)
 	}
 	else
 		cout << "*** Error on releasing device: " << sdrplay_api_GetErrorString(err) << endl;
+	pthread_mutex_unlock(&stateLock);
 
 	cout << "**** Rx thread terminating. ****" << endl;
 	return 0;
