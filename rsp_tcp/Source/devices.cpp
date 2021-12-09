@@ -29,7 +29,7 @@
 
 using namespace std;
 static rsp_cmdLineArgs* pargs = 0;
-
+extern bool exitRequest;
 /// <summary>
 /// Collect all sdrplay devices
 /// </summary>
@@ -52,7 +52,7 @@ bool devices::getDevices()
 				if (err != sdrplay_api_Success)
 					throw msg_exception(error.c_str());
 
-				if ((sdrplayDevices[i].hwVer < 1 || sdrplayDevices[i].hwVer > 3) &&
+				if ((sdrplayDevices[i].hwVer < 1 || sdrplayDevices[i].hwVer > 4) &&
 					sdrplayDevices[i].hwVer != 255)
 				{
 					printf("Unknown Hardware version %d .\n", sdrplayDevices[i].hwVer);
@@ -75,17 +75,35 @@ void devices::Start(rsp_cmdLineArgs*  args)
 		pargs = args;
 	try
 	{
+		if (numDevices < 1)
+			throw msg_exception("No sdrplay devices present.");
+
 		listenerAddress = pargs->Address;
 		listenerPort = pargs->Port;
 		initListener();
 		doListen();
-
-		if (numDevices < 1)
-			throw msg_exception("No sdrplay devices present.");
 	}
 	catch (const std::exception& e)
 	{
 		cout << "Cannot start listener: " << e.what() << endl;
+	}
+}
+void devices::Stop()
+{
+	try
+	{
+		closesocket(clientSocket);
+		closesocket(listenSocket);
+		Sleep(2000); // let the controlThread terminate
+		if (pd != 0 )
+		{
+			pd->ctrlThreadExitFlag = true;
+		}
+		exit(-5);
+	}
+	catch (const std::exception& e)
+	{
+		cout << "Exception when stopping: " << e.what() << endl;
 	}
 }
 
@@ -120,23 +138,26 @@ void devices::doListen()
 	sdrplay_api_ErrT err;
 	try
 	{
-		devices* d = this;
 		int maxConnections = 1;
-		SOCKET sock = listenSocket;
-		int res = listen(sock, maxConnections);
+		int res = listen(listenSocket, maxConnections);
 		if (res == SOCKET_ERROR)
 			throw msg_exception(common::getSocketErrorString());
 
-		while (sock != INVALID_SOCKET)
+		while (listenSocket != INVALID_SOCKET)
 		{
-			sdrplay_device* pd = new sdrplay_device(pargs);
+			pd = new sdrplay_device(pargs);
 			if (pd == 0)
 				throw "Cannot create device";
 
-
 			cout << "Listening to " << pargs->Address.sIPAddress << ":" << to_string(pargs->Port) << endl;
 			socklen_t rlen = sizeof(remote);
-			clientSocket = accept(sock, (struct sockaddr *)&remote, &rlen);
+			clientSocket = accept(listenSocket, (struct sockaddr *)&remote, &rlen);
+			if (clientSocket == INVALID_SOCKET || exitRequest)
+			{
+				cout << "Server socket accept error." << endl;
+				for(;;)
+					;
+			}
 			cout << "Client Accepted!\n" << endl;
 
 			pd->start(clientSocket); // creates the receive and stream thread

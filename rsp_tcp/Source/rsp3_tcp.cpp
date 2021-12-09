@@ -28,12 +28,10 @@
 
 #include <iostream>
 #include <stdio.h>
-#include "common.h"
 #include "rsp_tcp.h"
 #include "rsp_cmdLineArgs.h"
 #include "devices.h"
 #include "sdrGainTable.h"
-#include "syTwoDimArray.h"
 #ifndef _WIN32
 #include <signal.h>
 #endif
@@ -42,13 +40,13 @@
 #include <signal.h>
 
 using namespace std;
-int masterInitialised = 0;
-int slaveUninitialised = 0;
-sdrplay_api_DeviceT *chosenDevice = NULL;
 
+// From RSP2_tcp
 // V0.9.8	Sampling rate 2.000 for ADS-B
 // V0.9.9	Bitwidth 8 Bit corrected
-string Version = "0.3.1a";
+string Version = "0.3.1b";
+
+bool exitRequest = false;
 
 map<eErrors, string> returnErrorStrings =
 {
@@ -61,24 +59,16 @@ map<eErrors, string> returnErrorStrings =
 };
 
 
-void SigInt_Handler(int n_signal)
+BOOL WINAPI CtrlHandler(int n_signal)
 {
-	//printf("interrupted\n");
-	//sdrplay_api_Close();
-	//#ifdef _WIN32
-	//WSACleanup();
-	//#endif
-	//exit(1);
-}
-
-void SigBreak_Handler(int n_signal)
-{
-	sdrplay_api_Close();
-	printf("sdrplay_api closed\n");
-	#ifdef _WIN32
-	WSACleanup();
-	#endif
-	exit(2);
+	if (n_signal == CTRL_C_EVENT || n_signal == CTRL_CLOSE_EVENT)
+	{
+		printf("Exit request\n");
+		exitRequest = true;
+		devices::instance().Stop();
+		return TRUE;
+	}
+	return FALSE;
 }
 
 int main(int argc, char* argv[])
@@ -97,10 +87,8 @@ int main(int argc, char* argv[])
 		sError = returnErrorStrings[retCode] + to_string(result);
 		goto exit;
 	}
-	signal(SIGINT, &SigInt_Handler);
-	signal(SIGBREAK, &SigBreak_Handler);
-	//if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler, TRUE) == FALSE)
-	//	std::cout << "Error setting ctrl-c handler." << endl;
+	if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)CtrlHandler, TRUE) == FALSE)
+		std::cout << "Error setting ctrl-c handler." << endl;
 #else
 	struct sigaction sigact, sigign;
 	sigact.sa_handler = sighandler;
@@ -197,12 +185,11 @@ int main(int argc, char* argv[])
 			cout << "\n";
 		}
 		devices::instance().Start(pargs);
-		goto close;
+		goto Close;
 	}
 	else
 	{
 		retCode = E_NO_DEVICE;
-		sError = returnErrorStrings[retCode];
 		goto exit;
 	}
 
@@ -210,11 +197,9 @@ exit:
 	if (retCode != 0)
 	{
 		delete pargs;
-		std::cout << sError << endl;
-		std::cout << "Application cannot continue. \n" << endl;
-		sdrplay_api_UnlockDeviceApi();
-	close:		
-		std::cout << "Application closing. \n" << endl;
+		cout << returnErrorStrings[retCode] << endl;
+	Close:		
+		cout << "Application closing. \n" << endl;
 		sdrplay_api_Close();
 	}
 #ifdef _WIN32

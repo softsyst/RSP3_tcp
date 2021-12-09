@@ -27,6 +27,7 @@
 using namespace std;
 
 static LARGE_INTEGER Count1, Count2;
+extern bool exitRequest;
 
 
 sdrplay_device::~sdrplay_device()
@@ -459,8 +460,10 @@ BYTE* sdrplay_device::mergeIQ(const short* idata, const short* qdata, int sample
 void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner, 
 	sdrplay_api_EventParamsT *params, void *cbContext)
 {
-	sdrplay_device* md = (sdrplay_device*)cbContext;
+	if ( exitRequest)
+		return;
 
+	sdrplay_device* md = (sdrplay_device*)cbContext;
 
 	int masterInitialised = 0;
 	int slaveUninitialised = 0;
@@ -547,6 +550,8 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 void streamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params,
 	unsigned int numSamples, unsigned int reset, void* cbContext)
 {
+	if (exitRequest)
+		return;
 	if (reset)
 		printf("sdrplay_api_StreamACallback: numSamples=%d\n", numSamples);
 	
@@ -556,6 +561,8 @@ void streamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params,
 void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params, 
 	unsigned int numSamples, unsigned int reset, void *cbContext)
 {
+	if (exitRequest)
+		return;
 	if (reset)
 		printf("sdrplay_api_StreamBCallback: numSamples=%d\n", numSamples);
 	// Process stream callback data here - this callback will only be used in dual tuner mode
@@ -650,7 +657,8 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	cout << " Using Gain Reduction: " << gainReduction << endl;
 
 	// next doesn't work in master/slave mode, 
-	//pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
+	pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
+	//pCurCh->tunerParams.ifType = sdrplay_api_IF_0_450;
 
 	deviceParams->devParams->fsFreq.fsHz = currentSamplingRateHz; // initially set in init
 	int ix = getSamplingConfigurationTableIndex(currentSamplingRateHz);
@@ -665,7 +673,7 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	byte decimationFactor = samplingConfigs[ix].decimationFactor;
 	pCurCh->ctrlParams.decimation.decimationFactor = decimationFactor;
 	pCurCh->ctrlParams.decimation.enable = decimationFactor == 1 ? 0 : 1;
-	pCurCh->ctrlParams.decimation.wideBandSignal = currentSamplingRateHz == 2000000 ? 1 : 0;
+	//pCurCh->ctrlParams.decimation.wideBandSignal = currentSamplingRateHz == 2000000 ? 1 : 0;
 	pCurCh->tunerParams.rfFreq.rfHz = 222064000;
 
 	pCurCh->ctrlParams.agc.setPoint_dBfs = -60;
@@ -1102,7 +1110,17 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 		cout << "BiasT setting: " << value << endl;
 	return err;
 }
+sdrplay_api_ErrT sdrplay_device::setAdsbMode()
+{
+	pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_NO_DECIMATION_BANDPASS_2MHZ;
+	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+			sdrplay_api_Update_Ctrl_AdsbMode, sdrplay_api_Update_Ext1_None);
 
+	cout << "\nSet ADSB mode returned with: " << err << endl;
+	if (err != sdrplay_api_Success)
+		cout << "ADSB mode  error: " << err << endl;
+	return err;
+}
 sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 {
 	switch (rxType)

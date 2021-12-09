@@ -273,7 +273,7 @@ void gainConfiguration::createGainConfigTables()
 		 return Band_60_420MHz;
 	 else if (freqHz >= 420000000 && freqHz < 1000000000)
 		 return Band_420_1000MHz;
-	 else if (freqHz >= 1000000000 && freqHz < 1000000000)
+	 else if (freqHz >= 1000000000 && freqHz < 2000000000)
 		 return Band_1000_2000MHz;
 	 else
 		 return Band_Invalid;

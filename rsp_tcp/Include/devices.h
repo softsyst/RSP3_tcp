@@ -67,9 +67,9 @@ private:
 	void initListener();
 	void doListen();
 
-	sdrplay_device* currentDevice;
-	SOCKET clientSocket = INVALID_SOCKET;
 	SOCKET listenSocket = INVALID_SOCKET;
+	SOCKET clientSocket = INVALID_SOCKET;
+	sdrplay_device* currentDevice;
 	sockaddr_in local;
 	sockaddr_in remote;
 	struct addrinfo *result = NULL;
@@ -81,6 +81,7 @@ private:
 	// default values, may be overridden by command line arguments
     IPAddress  listenerAddress = IPAddress(0,0,0,0);
 	int listenerPort = 7890;
+	sdrplay_device* pd = 0;
 
 public:
 

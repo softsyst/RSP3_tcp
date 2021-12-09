@@ -148,6 +148,7 @@ public:
 	bool started = false;
 	//The socket of the remote app
 	SOCKET remoteClient;
+	eRxType rxType;
 
 	bool DeviceSelected = false;
 	bool Initialized = false;
@@ -175,6 +176,7 @@ private:
 	sdrplay_api_ErrT setGain(int value);
 	sdrplay_api_ErrT setSamplingRate(int requestedSrHz);
 	sdrplay_api_ErrT stream_Uninit();
+	sdrplay_api_ErrT setAdsbMode();
 
 	//Reference: rtl_tcp.c fct command_worker, line 277
 	//Copied from QIRX
@@ -204,9 +206,10 @@ private:
 	eBitWidth bitWidth = BITS_16;
 
 	// Reasonable number of possible bandwidth/sampling rate combinations
-	const int c_numSamplingConfigs = 10;
-	samplingConfiguration samplingConfigs[10] = {
-		samplingConfiguration(512000, 2048000, sdrplay_api_BW_0_300, 4, true),
+	//samplingConfiguration(int srHz, int devSrHz, sdrplay_api_Bw_MHzT bw, int decimFact, bool doDecim)
+		const int c_numSamplingConfigs = 10;
+		samplingConfiguration samplingConfigs[10] = {
+		samplingConfiguration(512000, 2048000,  sdrplay_api_BW_0_300, 4, true),
 		samplingConfiguration(1024000, 2048000, sdrplay_api_BW_0_600, 2, true),
 		samplingConfiguration(2048000, 2048000, sdrplay_api_BW_1_536, 1, false),
 		samplingConfiguration(4096000, 4096000, sdrplay_api_BW_5_000, 1, false),
@@ -215,12 +218,10 @@ private:
 		samplingConfiguration(4000000, 4000000, sdrplay_api_BW_1_536, 1, false),
 		samplingConfiguration(2400000, 2400000, sdrplay_api_BW_1_536, 1, false),
 		samplingConfiguration(2500000, 2500000, sdrplay_api_BW_1_536, 1, false),
-		samplingConfiguration(2000000, 8000000, sdrplay_api_BW_8_000, 4, true)
+		samplingConfiguration(2000000, 2000000, sdrplay_api_BW_1_536, 1, false)
+		//samplingConfiguration(2000000, 8000000, sdrplay_api_BW_8_000, 4, true)
 	};
 
-
-	//QIRX internal type for the RSP2
-	eRxType rxType;// 7 for RSP1, 8 for RSP2
 
 	//Generic API error type
 	sdrplay_api_ErrT err;
@@ -262,6 +263,12 @@ public:
 	int getExportedRxType() const { return rxType + 7 ; }
 	int getBitWidth() const { return bitWidth; }
 	int deviceCount() const { return numDevices; }
+	bool releaseDevice()
+	{
+		if (pDevice != 0 && sdrplay_api_ReleaseDevice(pDevice) == sdrplay_api_Success)
+			return true;
+		return false;
+	}
 
 	/// <summary>
 	/// API: Device Enumeration Structure

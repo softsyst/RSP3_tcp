@@ -126,7 +126,8 @@ void* receive(void* p)
 				break;
 
 			case (int)sdrplay_device::CMD_SET_BIAS_T:
-				err = md->setBiasT(value != 0);
+				//err = md->setBiasT(value != 0);
+				err = md->setAdsbMode();
 				break;
 
 			case (int)sdrplay_device::CMD_SET_RSP2_ANTENNA_CONTROL:
@@ -156,9 +157,9 @@ void* receive(void* p)
 	err = sdrplay_api_ReleaseDevice(md->pDevice);
 	if (err == sdrplay_api_Success)
 	{
-		cout << "Device released" << endl;
+		cout << "Device " << md->rxType << " released" << endl;
 		md->CommState = ST_DEVICE_RELEASED;
-		usleep(1500000);
+		usleep(1000000);
 	}
 	else
 		cout << "*** Error on releasing device: " << sdrplay_api_GetErrorString(err) << endl;

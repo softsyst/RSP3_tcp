@@ -249,10 +249,6 @@ void *ctrl_thread_fn(void *arg)
 
 		while (1) 
 		{
-			/* @TODO: check if something else has to be transmitted */
-			if (false)
-				goto sleep;
-
 			len = 2;
 			total_gain = 123;
 			result = 0;
@@ -318,8 +314,10 @@ void *ctrl_thread_fn(void *arg)
 			txbuf[1] = len & 0xff;
 
 			if (!sendBuffer(controlSocket, txbuf, len, do_exit))
-				goto close;
+				break;
 		sleep:
+			if (*do_exit)
+				break;
 			usleep(wait);
 		}
 	close:
