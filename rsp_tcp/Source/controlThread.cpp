@@ -63,7 +63,8 @@ enum eIndications
 	, IND_BIT_WIDTH			= 0x85            // 1 byte
 	, IND_OVERLOAD_A		= 0x86            // 1 byte, 1 == overload
 	, IND_OVERLOAD_B		= 0x87            // 1 byte
-	, IND_DEVICE_RELEASED	= 0x88            // 1 byte
+	, IND_DEVICE_RELEASED	= 0x88            // 1 byte bool
+	, IND_RSPDUO_HiZ    	= 0x89            // 1 byte bool
 };
 #else
 #define closesocket close
@@ -258,6 +259,7 @@ void *ctrl_thread_fn(void *arg)
 			float gain = 0;
 			int lnastate = 0;
 			bool overload_a = false, overload_b = false;
+			bool rspDuoHiZ = false;
 			int buflen = 0;
 
 			pthread_mutex_lock(&stateLock);
@@ -306,6 +308,9 @@ void *ctrl_thread_fn(void *arg)
 				dev->getOverload(overload_a, overload_b);
 				len = prepareIntCommand(txbuf, len, IND_OVERLOAD_A, overload_a ? 1 : 0, 1);
 				len = prepareIntCommand(txbuf, len, IND_OVERLOAD_B, overload_b ? 1 : 0, 1);
+
+				rspDuoHiZ = dev->getRspDuoHiZ();
+				len = prepareIntCommand(txbuf, len, IND_RSPDUO_HiZ, rspDuoHiZ ? 1 : 0, 1);
 			
 				break;
 			default:

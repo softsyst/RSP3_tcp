@@ -175,6 +175,7 @@ private:
 	sdrplay_api_ErrT setSamplingRate(int requestedSrHz);
 	sdrplay_api_ErrT stream_Uninit();
 	sdrplay_api_ErrT setAdsbMode();
+	sdrplay_api_ErrT setRSPduoHiZ(int value);
 
 	//Reference: rtl_tcp.c fct command_worker, line 277
 	//Copied from QIRX
@@ -196,6 +197,7 @@ private:
 		, CMD_SET_RSP_LNA_STATE = 0x4b        // 0: most sensitive, 8: least sensitive
 		, CMD_SET_RSP_REQUEST_ALL_SERIALS = 0x80      // request for all serials to be transmitted via back channel
 		, CMD_SET_RSP_SELECT_SERIAL = 0x81    // value is four bytes CRC-32 of the requested serial number
+		, CMD_SET_RSP_DUO_HI_Z = 0x82         // 1/0: HiZ on/off for the RSPduo
 	};
 
 	// This server is able to stream native 16-bit data (of "short" type)
@@ -232,6 +234,8 @@ private:
 	int gainReduction;				// Calculated from the RequestedGain
 	double currentSamplingRateHz;
 	int antenna = 5;
+
+	bool _rspDuoHiZ = false;
 	
 	//Callbacks per second, for a "timer" to discard samples 
 	//to prevent overrun in the device in the error case
@@ -273,6 +277,12 @@ public:
 	/// </summary>
 	string serno() { if (pDevice == 0) return "";  return pDevice->SerNo; }		// serial number
 	BYTE hwVer() { if (pDevice == 0) return 0; return pDevice->hwVer; }
+
+	bool sdrplay_device::getRspDuoHiZ()
+	{
+		return _rspDuoHiZ;
+	}
+
 
 	void getOverload(bool& overload_a, bool& overload_b) {
 		overload_a = overloaded_A;

@@ -923,7 +923,6 @@ int sdrplay_device::getLNAState()
 		return -1;
 	return pCurCh->tunerParams.gain.LNAstate;
 }
-
 sdrplay_api_ErrT sdrplay_device::setSamplingRate(int requestedSrHz)
 {
 	cout << "New Samplingrate requested: " << requestedSrHz << endl;
@@ -1074,24 +1073,82 @@ sdrplay_api_ErrT sdrplay_device::setAdsbMode()
 		cout << "ADSB mode  error: " << err << endl;
 	return err;
 }
+
+// 1: on
+sdrplay_api_ErrT sdrplay_device::setRSPduoHiZ(int value)
+{
+	if (rxType != RSPduo)
+		err = sdrplay_api_InvalidParam;
+
+	// allow only with Tuner A
+	else if (rxType == RSPduo && pDevice->tuner == sdrplay_api_Tuner_B)
+		err = sdrplay_api_InvalidParam;
+	else
+	{
+		if (value)
+			pCurCh->rspDuoTunerParams.tuner1AmPortSel = sdrplay_api_RspDuo_AMPORT_1;
+		else
+			pCurCh->rspDuoTunerParams.tuner1AmPortSel = sdrplay_api_RspDuo_AMPORT_2;
+
+		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+			sdrplay_api_Update_RspDuo_AmPortSelect,
+			sdrplay_api_Update_Ext1_None);
+
+		_rspDuoHiZ = value == 1;
+	}
+
+	if (err != sdrplay_api_Success)
+	{
+		cout << "***RSPduo HiZ control setting error: " << err << endl;
+		return err;
+	}
+	else
+	{
+		_rspDuoHiZ = value == 1;
+		cout << "\RSPduo HiZ control returned " << err << endl;
+	}
+}
 sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 {
+	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz);
 	switch (rxType)
 	{
 		case RSP1A:
 			err = sdrplay_api_InvalidParam;
 			break;
 		case RSP2:
-			pCurCh->rsp2TunerParams.antennaSel = (sdrplay_api_Rsp2_AntennaSelectT)value;
-			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-				sdrplay_api_Update_Rsp2_AntennaControl, sdrplay_api_Update_Ext1_None);
+			// Antenna A or Antenna B
+			if (value == 5 ||  value == 6)
+			{
+				pCurCh->rsp2TunerParams.antennaSel = (sdrplay_api_Rsp2_AntennaSelectT)value;
+				pCurCh->rsp2TunerParams.amPortSel = sdrplay_api_Rsp2_AMPORT_2;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+					(sdrplay_api_ReasonForUpdateT)(sdrplay_api_Update_Rsp2_AntennaControl | sdrplay_api_Update_Rsp2_AmPortSelect),
+					sdrplay_api_Update_Ext1_None);
+			}
+
+			// HiZ
+			else if (value == 7 && band == Band_0_60MHz)
+			{
+				pCurCh->rsp2TunerParams.amPortSel = sdrplay_api_Rsp2_AMPORT_1;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+					sdrplay_api_Update_Rsp2_AmPortSelect,
+					sdrplay_api_Update_Ext1_None);
+			}
 			break;
+
 		case RSPduo:
 			if (value == 5) //Tuner A requested
 			{
 				if (pDevice->tuner != sdrplay_api_Tuner_A)
 				{
-					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_2);// , sdrplay_api_RspDuo_AMPORT_1);
+					sdrplay_api_RspDuo_AmPortSelectT par;
+					if (_rspDuoHiZ)
+						par = sdrplay_api_RspDuo_AMPORT_1;
+					else
+						par = sdrplay_api_RspDuo_AMPORT_2;
+
+					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, par);// , sdrplay_api_RspDuo_AMPORT_1);
 					if (err == sdrplay_api_Success)
 						selectChannel(sdrplay_api_Tuner_A);
 				}
@@ -1099,7 +1156,7 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 			else if (value == 6) //Tuner B requested
 			{
 				if (pDevice->tuner != sdrplay_api_Tuner_B)
-					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_1);// , sdrplay_api_RspDuo_AMPORT_1);
+					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_2);// , sdrplay_api_RspDuo_AMPORT_1);
 					if (err == sdrplay_api_Success)
 						selectChannel(sdrplay_api_Tuner_B);
 			}
