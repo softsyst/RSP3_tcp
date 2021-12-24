@@ -146,11 +146,6 @@ int main(int argc, char* argv[])
 	{
 		printf("sdrplay_api_DisableHeartbeat failed %s\n", sdrplay_api_GetErrorString(err));
 	}
-	//// Enable debug logging output
-	//if ((err = sdrplay_api_DebugEnable(pd->dev, sdrplay_api_DbgLvl_Verbose)) == sdrplay_api_Success)
-	//	cout << "Debug Enabled!" << endl;
-	//else
-	//	cout << "*** Debug Enabled failed with " << sdrplay_api_GetErrorString(err) << endl;
 	////////////////////////////////////////////////////////////////
 //#endif
 	//// Lock API while device selection is performed

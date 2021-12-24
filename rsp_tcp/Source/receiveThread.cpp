@@ -151,7 +151,7 @@ void* receive(void* p)
 	}
 	catch (exception& e)
 	{
-		cout << "*** Error in receive :" << e.what() << endl;
+		cout << "*** Exception in receive :" << e.what() << endl;
 	}
 	pthread_mutex_lock(&stateLock);
 

@@ -25,6 +25,7 @@
 #include "rsp_cmdLineArgs.h"
 #define HAVE_STRUCT_TIMESPEC
 #include <pthread.h>
+#include "SafeQueue.h"
 #ifdef _WIN32
 #define sleep(n) Sleep(n*1000)
 #define usleep(n) Sleep(n/1000)
@@ -43,11 +44,33 @@ enum eCommState
 	, ST_DEVICE_RELEASED 	  
 };
 
+struct MemBlock
+{
+	BYTE* Mem;
+	int length;
+	int numSamples;
+	bool exitMsg;
 
-static bool VERBOSE = false;
+	MemBlock(BYTE* buf, int buflen, int numsmp) : 
+		Mem(buf), 
+		length(buflen),
+		numSamples(numsmp),
+		exitMsg(false)
+	{
+	}
+
+	~MemBlock()
+	{
+		delete[] Mem;
+	}
+};
+
+static bool VERBOSE = true;
 const int MAX_TUNERS = 2;
 
 void* receive(void* md);
+void* sendStream(void* md);
+
 void streamACallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 	unsigned int numSamples, unsigned int reset, void *cbContext);
 
@@ -120,10 +143,12 @@ public:
 	pthread_mutex_t mutex_rxThreadStarted;
 	pthread_cond_t started_cond = PTHREAD_COND_INITIALIZER;
 	pthread_t* thrdRx;
+	pthread_t* thrdTx;
 	pthread_t* thrdCtrl;
 	ctrl_thread_data_t ctrlThreadData;
 	bool ctrlThreadExitFlag = false;
 
+	SafeQueue<MemBlock*> SafeQ;
 	/// <summary>
 	/// Current values, to be sent to the host
 	/// </summary>
@@ -148,8 +173,19 @@ public:
 	SOCKET remoteClient;
 	eRxType rxType;
 
+	DWORD _oldNumSamples;
+	DWORD _oldExpectedFirstSampleNum;
+	DWORD _expectedFirstSampleNum;
+
 	bool DeviceSelected = false;
 	bool Initialized = false;
+
+	//Callbacks per second, for a "timer" to discard samples 
+	//to prevent overrun in the device in the error case
+	int cbksPerSecond = 0;
+	bool cbkTimerStarted = false;
+	double currentSamplingRateHz;
+
 	const int c_welcomeMessageLength = 100;
 
 private:
@@ -162,7 +198,7 @@ private:
 	sdrplay_api_ErrT  selectDevice(uint32_t crc);
 	void selectChannel(sdrplay_api_TunerSelectT tunerId);
 
-	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen);
+	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen, int startIx);
 	sdrplay_api_ErrT createChannels();
 	sdrplay_api_ErrT setFrequency(int valueHz);
 	sdrplay_api_ErrT setFrequencyCorrection(int value);
@@ -232,17 +268,12 @@ private:
 	// currently commanded values
 	int currentFrequencyHz;
 	int gainReduction;				// Calculated from the RequestedGain
-	double currentSamplingRateHz;
 	int antenna = 5;
 
 	bool _rspDuoHiZ = false;
 	
-	//Callbacks per second, for a "timer" to discard samples 
-	//to prevent overrun in the device in the error case
-	int cbksPerSecond = 0;
-	bool cbkTimerStarted = false;
-
 	sdrplay_api_RxChannelParamsT* pCurCh;
+
 
 public:
 	sdrplay_api_DeviceT* getDevice()

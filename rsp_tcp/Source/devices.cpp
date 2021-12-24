@@ -181,10 +181,17 @@ void devices::doListen()
 			if (clientSocket == INVALID_SOCKET || exitRequest)
 			{
 				cout << "Server socket accept error." << endl;
-				for(;;)
-					;
+				break;
 			}
 			cout << "Client Accepted!\n" << endl;
+			int yes = 1;
+			int result = setsockopt(clientSocket,
+				IPPROTO_TCP,
+				TCP_NODELAY,
+				(char*)&yes,
+				sizeof(int));    // 1 - on, 0 - off
+			if (result < 0)
+				cout << "Error on setting TCP_NODELAY" << endl;
 
 			pd->start(clientSocket); // creates the receive and stream thread
 
@@ -199,6 +206,11 @@ void devices::doListen()
 			cout << endl << "++++ Ctrl thread terminated ++++" << endl;
 			delete pd->thrdCtrl;
 			pd->thrdCtrl = 0;
+
+			pthread_join(*pd->thrdTx, &status);
+			cout << endl << "++++ Tx thread terminated ++++" << endl;
+			delete pd->thrdTx;
+			pd->thrdTx = 0;
 
 			closesocket(clientSocket);
 			pd->remoteClient = INVALID_SOCKET;

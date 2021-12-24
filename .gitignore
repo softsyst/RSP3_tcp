@@ -73,3 +73,11 @@
 /.vs/RSP3_TCP/v16/ipch/AutoPCH/8ba9e6b1eb0a7c6/RECEIVETHREAD.ipch
 /.vs/RSP3_TCP/v16/ipch/AutoPCH/65daed1b3c14181b/SDRGAINTABLE.ipch
 *.ipch
+*.suo
+*.db
+*.db-shm
+*.db-wal
+*.opendb
+/.vs/RSP3_TCP/project-colors.json
+/x64/Debug/RSP3_tcp.7z
+/x64/Release/RSP3_tcp.7z

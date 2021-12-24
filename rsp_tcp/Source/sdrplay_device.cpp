@@ -18,12 +18,14 @@
 **
 **/
 //#define TIME_MEAS
+//#define TIME_MEAS2
 #include "devices.h"
 #include "sdrplay_device.h"
 #include "sdrGainTable.h"
 //#include "MeasTimeDiff.h"
 #include <string.h>
 #include <iostream>
+#include <MeasTimeDiff.h>
 using namespace std;
 
 static LARGE_INTEGER Count1, Count2;
@@ -49,10 +51,15 @@ sdrplay_device::sdrplay_device(rsp_cmdLineArgs* args)
 	init(pargs);
 
 	thrdRx = 0;
+	thrdTx = 0;
 	pthread_mutex_init(&mutex_rxThreadStarted, NULL);
 	pthread_cond_init(&started_cond, NULL);
 
 #ifdef TIME_MEAS
+	Count1.LowPart = Count2.LowPart = 0;
+	Count1.HighPart = Count2.HighPart = 0;
+#endif
+#ifdef TIME_MEAS2
 	Count1.LowPart = Count2.LowPart = 0;
 	Count1.HighPart = Count2.HighPart = 0;
 #endif
@@ -94,7 +101,7 @@ int sdrplay_device::prepareSerialsList(BYTE* buf)
 		*p++ = sdrplayDevices[i].hwVer;
 		*p++ = ';';
 	}
-	int len = p - buf;
+	int len = int(p - buf);
 	return len;
 }
 
@@ -176,6 +183,11 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 					break;
 				}
 				DeviceSelected = true;
+				//// Enable debug logging output
+				//if ((err = sdrplay_api_DebugEnable(pd->dev, sdrplay_api_DbgLvl_Verbose)) == sdrplay_api_Success)
+				//	cout << "Debug Enabled!" << endl;
+				//else
+				//	cout << "*** Debug Enabled failed with " << sdrplay_api_GetErrorString(err) << endl;
 				break;
 			}
 		}
@@ -248,8 +260,6 @@ void sdrplay_device::start(SOCKET client)
 	// create the control thread and its socket communication
 	createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
 
-
-
 	if (thrdRx != 0) // just in case..
 	{
 		pthread_cancel(*thrdRx);
@@ -262,6 +272,20 @@ void sdrplay_device::start(SOCKET client)
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	int res = pthread_create(thrdRx, &attr, &receive, this);
+	pthread_attr_destroy(&attr);
+
+
+	if (thrdTx != 0) // just in case..
+	{
+		pthread_cancel(*thrdTx);
+		delete thrdTx;
+		thrdTx = 0;
+	}
+	thrdTx = new pthread_t();
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	res = pthread_create(thrdTx, &attr, &sendStream, this);
 	pthread_attr_destroy(&attr);
 
 	started = true;
@@ -290,13 +314,17 @@ void sdrplay_device::cleanup()
 		delete thrdRx;
 		thrdRx = 0;
 	}
+
+	//send exit message to transmitThread
+	BYTE* dummy = new BYTE[1];
+	MemBlock* mb = new MemBlock(dummy, 1, 0);
+	mb->exitMsg = true;
+	SafeQ.enqueue(mb);
 }
 
 
 void sdrplay_device::stop()
 {
-	sdrplay_api_ErrT err;
-
 	if (!started)
 	{
 		cout << "Already Stopped. Nothing to do here.";
@@ -347,7 +375,7 @@ sdrplay_api_GainValuesT* sdrplay_device::getGainValues()
 	return &GainValues;
 }
 
-BYTE* sdrplay_device::mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen)
+BYTE* sdrplay_device::mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen, int diff)
 {
 	BYTE* buf = 0;
 	buflen = 0;
@@ -438,14 +466,12 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 			int gr = md->pCurCh->tunerParams.gain.gRdB;
 			int lnastate = md->pCurCh->tunerParams.gain.LNAstate;
 			cout << "Overload detected on tuner A with lnastate " << lnastate << " and grdB: " << gr << endl;
-			//md->increaseLNAstate_A(2);
 		}
 		else if (tuner == sdrplay_api_Tuner_A && params->powerOverloadParams.powerOverloadChangeType ==
 			sdrplay_api_Overload_Corrected)
 		{
 			md->overloaded_A = false;
 			cout << "Overload corrected on tuner A" << endl;
-			//md->deviceParams->rxChannelB->tunerParams.gain.gRdB +=1;
 		}
 		else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
 			sdrplay_api_Overload_Detected)
@@ -504,7 +530,10 @@ void streamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params,
 	unsigned int numSamples, unsigned int reset, void* cbContext)
 {
 	if (exitRequest)
+	{
+		cout << "Exit request in streamACallback" << endl;
 		return;
+	}
 	if (reset)
 		printf("sdrplay_api_StreamACallback: numSamples=%d\n", numSamples);
 	
@@ -515,12 +544,44 @@ void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 	unsigned int numSamples, unsigned int reset, void *cbContext)
 {
 	if (exitRequest)
+	{
+		cout << "Exit request in streamBCallback" << endl;
 		return;
+	}
 	if (reset)
 		printf("sdrplay_api_StreamBCallback: numSamples=%d\n", numSamples);
 	// Process stream callback data here - this callback will only be used in dual tuner mode
 		streamCallback(xi, xq, params, numSamples, reset, cbContext);
 	return;
+}
+
+unsigned int areDiffSamples(sdrplay_device* ctx, sdrplay_api_StreamCbParamsT *par, unsigned int numSmpls)
+{
+	int diff = 0;
+	ctx->_oldExpectedFirstSampleNum = ctx->_expectedFirstSampleNum;
+
+	if (par->fsChanged || par->rfChanged)
+	{
+		ctx->_expectedFirstSampleNum = par->firstSampleNum;
+	}
+	else if (ctx->_expectedFirstSampleNum < par->firstSampleNum) // then callbacks lost?
+	{
+		diff = par->firstSampleNum  - ctx->_expectedFirstSampleNum;
+		cout << "Expected 1st spl num = " << ctx->_expectedFirstSampleNum << ", rcvd was " << par->firstSampleNum << ", Diff = " << diff << endl;
+		ctx->_expectedFirstSampleNum = par->firstSampleNum + par->numSamples;
+	}
+	else if (ctx->_expectedFirstSampleNum > par->firstSampleNum) //?? sth. repeated?
+	{
+		diff = ctx->_expectedFirstSampleNum - par->firstSampleNum;
+		cout << "Expected 1st spl num = " << ctx->_expectedFirstSampleNum << ", rcvd was " << par->firstSampleNum << ", Diff2 = " << diff << endl;
+		ctx->_expectedFirstSampleNum = par->firstSampleNum + par->numSamples;
+	}
+	else
+	{
+		ctx->_expectedFirstSampleNum += numSmpls;
+	}
+	ctx->_oldNumSamples = numSmpls;
+	return diff;
 }
 
 void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params, 
@@ -530,6 +591,12 @@ void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 	static int count = 0;
 
 	sdrplay_device* md = (sdrplay_device*)cbContext;
+
+#ifdef TIME_MEAS2
+		QueryPerformanceCounter(&Count1);
+#endif
+	unsigned int diff = areDiffSamples(md, params, numSamples);
+
 	try
 	{
 		//In case of a socket error, don't process the data for one second
@@ -540,18 +607,17 @@ void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 				md->cbkTimerStarted = true;
 				cout << "Discarding samples for one second\n";
 			}
-			return;
+			goto out;
 		}
 		else if (md->cbkTimerStarted)
 		{
 			md->cbkTimerStarted = false;
 		} 
 		if (md->remoteClient == INVALID_SOCKET)
-			return;
-
-
-		if (params->grChanged)
-			;
+		{
+			cout << "Invalid remote socket\n";
+			goto out;
+		}
 
 #ifdef TIME_MEAS
 		count++;
@@ -563,34 +629,22 @@ void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 		}
 #endif
 		int buflen = 0;
-		BYTE* buf = md->mergeIQ(xi, xq, numSamples, buflen);
-		int remaining = buflen;
-		int sent = 0;
-		while (remaining > 0)
-		{
-			fd_set writefds;
-			struct timeval tv= {1,0};
-			FD_ZERO(&writefds);
-			FD_SET(md->remoteClient, &writefds);
-			int res  = select(md->remoteClient+1, NULL, &writefds, NULL, &tv);
-			if (res > 0)
-			{
-				sent = send(md->remoteClient, (const char*)buf + (buflen - remaining), remaining, 0);
-				remaining -= sent;
-			}
-			else
-			{
-				md->cbksPerSecond = md->currentSamplingRateHz / numSamples; //1 sec "timer" in the error case. assumed this does not change frequently
-				delete[] buf;
-				throw msg_exception("socket error " + to_string(errno));
-			}
-		}
-		delete[] buf;
+		BYTE* buf = md->mergeIQ(xi, xq, numSamples, buflen, diff);
+		MemBlock* mblock = new MemBlock(buf, buflen, numSamples);
+		md->SafeQ.enqueue(mblock);
 	}
 	catch (exception& e)
 	{
 		cout << "Error in streaming callback :" << e.what() <<  endl;
 	}
+out:
+#ifdef TIME_MEAS2
+	QueryPerformanceCounter(&Count2);
+	double timeInMs =  CMeasTimeDiff::calcTimeDiff_in_ms(Count2, Count1);
+	if (timeInMs > 90)
+		CMeasTimeDiff::formattedTimeOutput("Callback time (ms) > ", timeInMs );
+#endif
+	return;
 }
 
 sdrplay_api_ErrT sdrplay_device::createChannels()
@@ -614,7 +668,7 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	//pCurCh->tunerParams.ifType = sdrplay_api_IF_0_450;
 
 	deviceParams->devParams->fsFreq.fsHz = currentSamplingRateHz; // initially set in init
-	int ix = getSamplingConfigurationTableIndex(currentSamplingRateHz);
+	int ix = getSamplingConfigurationTableIndex(int(currentSamplingRateHz));
 	if (ix < 0)
 	{
 		cout << "Invalid sampling rate: " << currentSamplingRateHz << endl;
@@ -754,8 +808,8 @@ sdrplay_api_ErrT sdrplay_device::setGain(int value)
 		{
 			cout << "Requested Gain of " << value << "   resulted in " << gr << " dB gain reduction." << endl;
 		}
-		return err;
 	}
+	return err;
 
 	//	if (RSPGainValuesFromRequestedGain(value, rxType, lnastate, gr))
 	//	{
@@ -1105,7 +1159,7 @@ sdrplay_api_ErrT sdrplay_device::setRSPduoHiZ(int value)
 	else
 	{
 		_rspDuoHiZ = value == 1;
-		cout << "\RSPduo HiZ control returned " << err << endl;
+		cout << "RSPduo HiZ control returned " << err << endl;
 	}
 }
 sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
