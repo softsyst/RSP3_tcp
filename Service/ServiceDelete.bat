@@ -1,1 +1,1 @@
-sc.exe DELETE "SDRplayAPIService"
+sc.exe DELETE SDRplayAPIService
