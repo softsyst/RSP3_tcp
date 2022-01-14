@@ -9,7 +9,8 @@ TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver 
 ## History
 ### V0.3.2
 - Back channel protocol for clean synchronization with the host on startup and shutdown.
-- Two-stage initialization process: 1st step: identify to the calling host, 2nd step: select the device with the requested Serial Number
+- Two-stage initialization process: 1st step: identify to the calling host, 2nd step: select the device with the requested Serial Number.
+- During normal operation, more device states like Overload, LNA State or Gain are reported on the back channel.
 - Cooperates with QIRX > V3.2.1
 ### V0.3.1, Initial Release, Basic Features
 - API compatible with RSP2_tcp
