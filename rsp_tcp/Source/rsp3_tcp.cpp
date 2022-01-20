@@ -141,13 +141,13 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	////////////////////////////////////////////////////////////////
-//#ifdef _DEBUG
+#ifdef _DEBUG
 	if ((err = sdrplay_api_DisableHeartbeat()) != sdrplay_api_Success)
 	{
 		printf("sdrplay_api_DisableHeartbeat failed %s\n", sdrplay_api_GetErrorString(err));
 	}
 	////////////////////////////////////////////////////////////////
-//#endif
+#endif
 	//// Lock API while device selection is performed
 	//sdrplay_api_LockDeviceApi();
 
