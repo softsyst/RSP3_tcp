@@ -200,6 +200,7 @@ private:
 
 	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen, int startIx);
 	sdrplay_api_ErrT createChannels();
+	sdrplay_api_ErrT createChannels(int srTableIx);
 	sdrplay_api_ErrT setFrequency(int valueHz);
 	sdrplay_api_ErrT setFrequencyCorrection(int value);
 	sdrplay_api_ErrT setFrequencyCorrection100(int value);
@@ -254,8 +255,8 @@ private:
 		samplingConfiguration(4000000, 4000000, sdrplay_api_BW_1_536, 1, false),
 		samplingConfiguration(2400000, 2400000, sdrplay_api_BW_1_536, 1, false),
 		samplingConfiguration(2500000, 2500000, sdrplay_api_BW_1_536, 1, false),
-		samplingConfiguration(2000000, 2000000, sdrplay_api_BW_1_536, 1, false)
-		//samplingConfiguration(2000000, 8000000, sdrplay_api_BW_8_000, 4, true)
+		//samplingConfiguration(2000000, 2000000, sdrplay_api_BW_8_000, 1, false)
+		samplingConfiguration(2000000, 8000000, sdrplay_api_BW_8_000, 4, true)
 	};
 
 

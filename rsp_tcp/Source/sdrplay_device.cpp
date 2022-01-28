@@ -647,6 +647,75 @@ out:
 	return;
 }
 
+sdrplay_api_ErrT sdrplay_device::createChannels(int srTableIx)
+{
+	Initialized = false;
+	sdrplay_api_DeviceT* pd = pDevice;
+	//pd->rspDuoSampleFreq = currentSamplingRateHz;
+	selectChannel(sdrplay_api_Tuner_A);
+
+	if (!RSPGainValuesFromRequestedGain(RequestedGain, rxType, LNAstate, gainReduction))
+	{
+		cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << RequestedGain << endl;
+		cout << "Program cannot continue" << endl;
+		return sdrplay_api_Fail;
+	}
+	cout << "\n Using LNA State: " << LNAstate << endl;
+	cout << " Using Gain Reduction: " << gainReduction << endl;
+
+	// next doesn't work in master/slave mode, 
+	pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
+	//pCurCh->tunerParams.ifType = sdrplay_api_IF_0_450;
+
+	int ix = srTableIx;
+	if (ix < 0)
+	{
+		cout << "Invalid sampling rate: " << currentSamplingRateHz << endl;
+		return sdrplay_api_InvalidParam;
+	}
+	deviceParams->devParams->fsFreq.fsHz = samplingConfigs[ix].deviceSamplingRateHz; // initially set in init
+
+	//// next doesn't work in master/slave mode, 
+	pCurCh->tunerParams.bwType = samplingConfigs[ix].bandwidth;
+	byte decimationFactor = samplingConfigs[ix].decimationFactor;
+	pCurCh->ctrlParams.decimation.decimationFactor = decimationFactor;
+	pCurCh->ctrlParams.decimation.enable = decimationFactor == 1 ? 0 : 1;
+	//pCurCh->ctrlParams.decimation.wideBandSignal = currentSamplingRateHz == 2000000 ? 1 : 0;
+	pCurCh->tunerParams.rfFreq.rfHz = 222064000;
+
+	pCurCh->ctrlParams.agc.setPoint_dBfs = -60;
+	pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
+	pCurCh->tunerParams.gain.gRdB = gainReduction;
+	pCurCh->tunerParams.gain.LNAstate = LNAstate;
+
+	// next doesn't work in master/slave mode, 
+	//deviceParams->rxChannelB->tunerParams.ifType = sdrplay_api_IF_Zero;
+	//deviceParams->rxChannelB->tunerParams.bwType= samplingConfigs[2].bandwidth ;
+	//deviceParams->rxChannelB->tunerParams.rfFreq.rfHz = 222064000;
+	//				   
+	//deviceParams->rxChannelB->ctrlParams.agc.setPoint_dBfs = -60;
+	//deviceParams->rxChannelB->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
+	//deviceParams->rxChannelB->tunerParams.gain.gRdB = gainReduction;
+	//deviceParams->rxChannelB->tunerParams.gain.LNAstate = LNAstate;
+	//deviceParams->rxChannelA->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
+
+	cbFns.StreamACbFn = streamACallback;
+	cbFns.StreamBCbFn = streamBCallback;
+	cbFns.EventCbFn = eventCallback;
+
+	sdrplay_api_ErrT errInit = sdrplay_api_Init(pDevice->dev, &cbFns, this);
+	cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
+	if (errInit == sdrplay_api_Success)
+		Initialized = true;
+	//double fs = deviceParams->devParams->fsFreq.fsHz;
+	return errInit;
+}
+
+void gainChangeCallback(unsigned int gRdB, unsigned int lnaGRdB, void* cbContext)
+{
+	// do nothing...
+}
+
 sdrplay_api_ErrT sdrplay_device::createChannels()
 {
 	Initialized = false;
@@ -709,11 +778,6 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 		Initialized = true;
 	//double fs = deviceParams->devParams->fsFreq.fsHz;
 	return errInit;
-}
-
-void gainChangeCallback(unsigned int gRdB, unsigned int lnaGRdB, void* cbContext)
-{
-	// do nothing...
 }
 
 
@@ -996,13 +1060,15 @@ sdrplay_api_ErrT sdrplay_device::setSamplingRate(int requestedSrHz)
 	if (ix >= 0)
 	{
 		currentSamplingRateHz = requestedSrHz;
-		err = createChannels();
+		err = createChannels(ix);
 		return err;
 	}
 	else
 	{
 
 	}
+	if (requestedSrHz == 2000000) //then assume ads-b
+		setAdsbMode();
 	return err;
 }
 
@@ -1118,7 +1184,8 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 }
 sdrplay_api_ErrT sdrplay_device::setAdsbMode()
 {
-	pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_NO_DECIMATION_BANDPASS_2MHZ;
+	//pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_NO_DECIMATION_BANDPASS_2MHZ;
+	pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_DECIMATION; // Andy's advice
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 			sdrplay_api_Update_Ctrl_AdsbMode, sdrplay_api_Update_Ext1_None);
 
