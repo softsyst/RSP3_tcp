@@ -146,6 +146,8 @@ int main(int argc, char* argv[])
 	{
 		printf("sdrplay_api_DisableHeartbeat failed %s\n", sdrplay_api_GetErrorString(err));
 	}
+	else
+		cout << " *** Heartbeat disabled *** " << endl;
 	////////////////////////////////////////////////////////////////
 #endif
 	//// Lock API while device selection is performed

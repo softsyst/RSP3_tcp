@@ -681,12 +681,12 @@ sdrplay_api_ErrT sdrplay_device::createChannels(int srTableIx)
 	pCurCh->ctrlParams.decimation.decimationFactor = decimationFactor;
 	pCurCh->ctrlParams.decimation.enable = decimationFactor == 1 ? 0 : 1;
 	//pCurCh->ctrlParams.decimation.wideBandSignal = currentSamplingRateHz == 2000000 ? 1 : 0;
-	pCurCh->tunerParams.rfFreq.rfHz = 222064000;
+	pCurCh->tunerParams.rfFreq.rfHz = 1090000;
 
 	pCurCh->ctrlParams.agc.setPoint_dBfs = -60;
 	pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
-	pCurCh->tunerParams.gain.gRdB = gainReduction;
-	pCurCh->tunerParams.gain.LNAstate = LNAstate;
+	pCurCh->tunerParams.gain.gRdB = 20;// gainReduction;
+	pCurCh->tunerParams.gain.LNAstate = 0;// LNAstate;
 
 	// next doesn't work in master/slave mode, 
 	//deviceParams->rxChannelB->tunerParams.ifType = sdrplay_api_IF_Zero;
