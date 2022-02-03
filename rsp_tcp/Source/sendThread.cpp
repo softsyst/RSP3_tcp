@@ -25,6 +25,15 @@ using namespace std;
 #define TIME_MEAS2
 static LARGE_INTEGER Count1, Count2;
 
+void emptyQ(sdrplay_device* p)
+{
+	cout << "*** Emptying xmit Queue ***" << endl;
+	while (p->SafeQ.getNumEntries() > 0)
+	{
+		MemBlock* mb = p->SafeQ.dequeue();
+		delete mb;
+	}
+}
 /// <summary>
 /// Send thread, to process blocks received possibly after some time from the callback,
 /// via a SafeQueue, to avoid timeouts.
@@ -36,16 +45,15 @@ void* sendStream(void* p)
 
 	for (;;)
 	{
+		if (md->doExitTxThread)
+		{
+			cout << "*** Exit requested (1) ***" << endl;
+			break;
+		}
 #ifdef TIME_MEAS2
 		QueryPerformanceCounter(&Count1);
 #endif
 		MemBlock* mb = md->SafeQ.dequeue();
-		if (mb->exitMsg)
-		{
-			cout << "*** Exit requested ***" << endl;
-			delete mb;
-			break;
-		}
 		try
 		{
 			int remaining = mb->length;
@@ -55,6 +63,11 @@ void* sendStream(void* p)
 			int sent = 0;
 			while (remaining > 0)
 			{
+				if (md->doExitTxThread)
+				{
+					cout << "*** Exit requested (2) ***" << endl;
+					break;
+				}
 				fd_set writefds;
 				//struct timeval tv = { 1,90000 };//90ms timeout
 				struct timeval tv= {1,0};
@@ -73,12 +86,17 @@ void* sendStream(void* p)
 					throw msg_exception("socket error " + to_string(errno));
 				}
 			}
+			if (md->doExitTxThread)
+			{
+				cout << "*** Exit requested (3) ***" << endl;
+				break;
+			}
 		}
 		catch (exception& e)
 		{
 			cout << "*** Error in transmit :" << e.what() << endl;
+			break;
 		}
-		delete mb; // deletes the mem block
 #ifdef TIME_MEAS2
 		QueryPerformanceCounter(&Count2);
 		double timeInMs = CMeasTimeDiff::calcTimeDiff_in_ms(Count2, Count1);
@@ -89,5 +107,6 @@ void* sendStream(void* p)
 		}
 #endif
 	}
+	emptyQ(md);
 	return 0;
 }

@@ -282,7 +282,7 @@ void sdrplay_device::start(SOCKET client)
 		thrdTx = 0;
 	}
 	thrdTx = new pthread_t();
-
+	doExitTxThread = false;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	res = pthread_create(thrdTx, &attr, &sendStream, this);
@@ -316,10 +316,7 @@ void sdrplay_device::cleanup()
 	}
 
 	//send exit message to transmitThread
-	BYTE* dummy = new BYTE[1];
-	MemBlock* mb = new MemBlock(dummy, 1, 0);
-	mb->exitMsg = true;
-	SafeQ.enqueue(mb);
+	doExitTxThread = true;
 }
 
 
@@ -330,8 +327,8 @@ void sdrplay_device::stop()
 		cout << "Already Stopped. Nothing to do here.";
 		return;
 	}
-	ctrlThreadExitFlag = true;
 	cleanup();
+	ctrlThreadExitFlag = true;
 
 }
 
@@ -805,49 +802,6 @@ sdrplay_api_ErrT sdrplay_device::setGain(int value)
 {
 	err = sdrplay_api_Success;
 
-	//if (AGC_A == true)
-	//{
-	//	int curGainValue = (int)(getGainValues() + 0.5f);
-	//	byte lnastate;
-	//	if (value > curGainValue)
-	//	{
-	//		// decrease lna state
-	//		lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-	//		LNAstate = lnastate - 1;
-	//		if (VERBOSE)
-	//			cout << "Requested gain of " << value << " set, GR: " << value << " , LNAState: " << LNAstate << endl;
-	//		deviceParams->rxChannelA->tunerParams.gain.LNAstate = (lnastate - 1) > 0 ? lnastate - 1 : 0;
-	//	}
-	//	else if (value < curGainValue)
-	//	{
-	//		// increase lna state
-	//		lnastate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-	//		LNAstate = lnastate + 1;
-	//		if (VERBOSE)
-	//			cout << "Requested gain of " << value << " set, GR: " << value << " , LNAState: " << (int)lnastate << endl;
-	//		deviceParams->rxChannelA->tunerParams.gain.LNAstate = (lnastate - 1) < 7 ? lnastate + 1 : 7;
-	//	}
-	//	else // value didn't change
-	//		return err;
-	//	curGainValue = value;
-	//	LNAstate = lnastate;
-
-	//	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-	//		sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-
-	//	cout << "\nsdrplay_api_Update_Tuner_GainReduction returned with: " << err << endl;
-	//	if (err != sdrplay_api_Success)
-	//	{
-	//		cout << "*** Error on Gain Reduction setting: " << sdrplay_api_GetErrorString(err) << endl;
-	//		cout << "Requested gain was: " << value << /*" , GR: " << gainReduction <<*/  " , lnastate: " << LNAstate << endl;
-	//	}
-	//	else
-	//	{
-	//		LNAstate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-	//		int gr = deviceParams->rxChannelA->tunerParams.gain.gRdB;
-	//		cout << "Result was GR: " << gr <<" , LNAState: " << LNAstate << endl;
-	//	}
-	//}
 	if (AGC_A == false)
 	{
 		sdrplay_api_ErrT err;
@@ -875,104 +829,6 @@ sdrplay_api_ErrT sdrplay_device::setGain(int value)
 	}
 	return err;
 
-	//	if (RSPGainValuesFromRequestedGain(value, rxType, lnastate, gr))
-	//	{
-	//		if (gr < 20)
-	//			gr = 20;
-	//		if (gr > 59)
-	//			gr = 59;
-	//		gainReduction = gr;
-	//		LNAstate = lnastate;
-	//		deviceParams->rxChannelA->tunerParams.gain.LNAstate = lnastate;
-	//		if (lnastate != (int(deviceParams->rxChannelA->tunerParams.gain.LNAstate)))
-	//		{
-	//			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-	//				sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-	//			if (VERBOSE)
-	//			{
-	//				cout << "Set Lnastate returned " << err << " with requested value: " << (int)(deviceParams->rxChannelA->tunerParams.gain.LNAstate) << endl;
-	//				cout << "LNA State: " << lnastate << endl;
-	//			}
-	//		}
-
-	//		deviceParams->rxChannelA->tunerParams.gain.gRdB = gainReduction;
-	//		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-	//			sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-
-	//		if (VERBOSE)
-	//		{
-	//			cout << "Set Gain reduction returned " << err << " with requested value: " << gainReduction << endl;
-	//			cout << "Gr value: " << gr << endl;
-	//		}
-	//		return err;
-	//	}
-	//	else
-	//	{
-	//		cout << "RSPGainValuesFromRequestedGain FAILED for the requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
-	//		return (sdrplay_api_ErrT)-1;
-	//	}
-
-	//	if (VERBOSE)
-	//		cout << "\Set Gr and LNA state returned with: " << err << endl;
-
-	//	if (err != sdrplay_api_Success)
-	//	{
-	//		cout << "Set Gr and LNA state  FAILED with requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
-	//	}
-	//	else if (VERBOSE)
-	//		cout << "Set Gr and LNA state  succeeded with requested value: " << gainConfiguration::GAIN_STEPS - value << endl;
-
-	//	return err;
-	//}
-
-	//return err;
-
-	//if (overloaded_A)
-	//{
-	//	//if (deviceParams->rxChannelA->tunerParams.gain.gRdB < 45)
-	//	//	deviceParams->rxChannelA->tunerParams.gain.gRdB += 10;
-	//	//else
-	//	//	deviceParams->rxChannelA->tunerParams.gain.LNAstate += 1;
-	//	//err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-	//	//	sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-
-	//	return err;
-	//}
-	//else
-	//	return sdrplay_api_Success;
-
-	//lnastate = 0;
-	//int gr = 0;
-
-	//bool res = RSPGainValuesFromRequestedGain(value, rxType, lnastate, gr);
-	//if (!res)
-	//{
-	//	cout << "*** Error: RSPGainValuesFromRequestedGain for " << value << " failed";
-	//	return err;
-	//}
-
-	//LNAstate = lnastate;
-	//gainReduction = gr;
-
-	//deviceParams->rxChannelA->tunerParams.gain.gRdB = gr;
-	//deviceParams->rxChannelA->tunerParams.gain.LNAstate = LNAstate;
-
-	//err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-	//	sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-
-	//cout << "\nsdrplay_api_Update_Tuner_GainReduction returned with: " << err << endl;
-	//if (err != sdrplay_api_Success)
-	//{
-	//	cout << "*** Error on Gain Reduction setting: " << sdrplay_api_GetErrorString(err) << endl;
-	//	cout << "Requested gain was: " << value << " , GR: " << gainReduction << /* " , LNAState: " << LNAstate <<*/ endl;
-	//}
-	//else
-	//{
-	//	LNAstate = deviceParams->rxChannelA->tunerParams.gain.LNAstate;
-	//	cout << "Requested gain of " << value << " set, GR: " << gainReduction << " , LNAState: " << LNAstate << endl;
-	//}
-
-	//return err;
 }
 sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 {
@@ -1004,9 +860,12 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 
 sdrplay_api_ErrT sdrplay_device::setLNAState(int value)
 {
-	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz);
+	bool isDx = rxType == RSPdx;
+
+	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode );
 	if (band == Band_Invalid)
 		return sdrplay_api_OutOfRange;
+
 	gainConfiguration gcfg(band);
 
 	int lnaStates = gcfg.LNAstates[rxType][band];
@@ -1171,6 +1030,11 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_RspDuo_BiasTControl, sdrplay_api_Update_Ext1_None);
 			break;
+		case RSPdx:
+			pCurCh->rspDuoTunerParams.biasTEnable = value;
+			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+				sdrplay_api_Update_None, sdrplay_api_Update_RspDx_BiasTControl);
+			break;
 		default:
 			break;
 	}
@@ -1231,7 +1095,10 @@ sdrplay_api_ErrT sdrplay_device::setRSPduoHiZ(int value)
 }
 sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 {
-	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz);
+	bool isDx = rxType == RSPdx;
+
+	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode);
+
 	switch (rxType)
 	{
 		case RSP1A:
@@ -1282,6 +1149,16 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 						selectChannel(sdrplay_api_Tuner_B);
 			}
 			break;
+		case RSPdx:
+			// Antenna A or Antenna B or Antenna C
+			if (value >= 0 && value <= 2 )
+			{
+				deviceParams->devParams->rspDxParams.antennaSel = (sdrplay_api_RspDx_AntennaSelectT)value;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+					(sdrplay_api_ReasonForUpdateT)(sdrplay_api_Update_None),
+					sdrplay_api_Update_RspDx_AntennaControl);
+			}
+
 		default:
 			err = sdrplay_api_InvalidParam;
 			break;
@@ -1304,7 +1181,8 @@ bool sdrplay_device::RSPGainValuesFromRequestedGain(int flatValue, int rxtype, i
 	if (flatGr)
 		return false;
 
-	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz);
+	bool isDx = rxType == RSPdx;
+	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode);
 	if (band == Band_Invalid)
 		return false;
 

@@ -49,13 +49,11 @@ struct MemBlock
 	BYTE* Mem;
 	int length;
 	int numSamples;
-	bool exitMsg;
 
 	MemBlock(BYTE* buf, int buflen, int numsmp) : 
 		Mem(buf), 
 		length(buflen),
-		numSamples(numsmp),
-		exitMsg(false)
+		numSamples(numsmp)
 	{
 	}
 
@@ -149,6 +147,7 @@ public:
 	bool ctrlThreadExitFlag = false;
 
 	SafeQueue<MemBlock*> SafeQ;
+	bool doExitTxThread = false;
 	/// <summary>
 	/// Current values, to be sent to the host
 	/// </summary>
@@ -172,6 +171,7 @@ public:
 	//The socket of the remote app
 	SOCKET remoteClient;
 	eRxType rxType;
+	bool dxHDRmode = false;
 
 	DWORD _oldNumSamples;
 	DWORD _oldExpectedFirstSampleNum;
