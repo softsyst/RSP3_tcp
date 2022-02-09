@@ -49,11 +49,13 @@ struct MemBlock
 	BYTE* Mem;
 	int length;
 	int numSamples;
+	bool exitMsg;
 
 	MemBlock(BYTE* buf, int buflen, int numsmp) : 
 		Mem(buf), 
 		length(buflen),
-		numSamples(numsmp)
+		numSamples(numsmp),
+		exitMsg(false)
 	{
 	}
 
@@ -197,6 +199,7 @@ private:
 	//bool selectDevice(rsp_cmdLineArgs* args);
 	sdrplay_api_ErrT  selectDevice(uint32_t crc);
 	void selectChannel(sdrplay_api_TunerSelectT tunerId);
+	void emptyQ();
 
 	BYTE* mergeIQ(const short* idata, const short* qdata, int samplesPerPacket, int& buflen, int startIx);
 	sdrplay_api_ErrT createChannels();

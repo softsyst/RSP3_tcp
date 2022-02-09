@@ -25,15 +25,15 @@ using namespace std;
 #define TIME_MEAS2
 static LARGE_INTEGER Count1, Count2;
 
-void emptyQ(sdrplay_device* p)
-{
-	cout << "*** Emptying xmit Queue ***" << endl;
-	while (p->SafeQ.getNumEntries() > 0)
-	{
-		MemBlock* mb = p->SafeQ.dequeue();
-		delete mb;
-	}
-}
+//void emptyQ(sdrplay_device* p)
+//{
+//	cout << "*** Emptying xmit Queue ***" << endl;
+//	while (p->SafeQ.getNumEntries() > 0)
+//	{
+//		MemBlock* mb = p->SafeQ.dequeue();
+//		delete mb;
+//	}
+//}
 /// <summary>
 /// Send thread, to process blocks received possibly after some time from the callback,
 /// via a SafeQueue, to avoid timeouts.
@@ -54,6 +54,11 @@ void* sendStream(void* p)
 		QueryPerformanceCounter(&Count1);
 #endif
 		MemBlock* mb = md->SafeQ.dequeue();
+		if (mb->exitMsg)
+		{
+			cout << "*** Exit msg received. ***" << endl;
+			break;
+		}
 		try
 		{
 			int remaining = mb->length;
@@ -85,6 +90,7 @@ void* sendStream(void* p)
 					delete mb;
 					throw msg_exception("socket error " + to_string(errno));
 				}
+				delete mb;
 			}
 			if (md->doExitTxThread)
 			{
@@ -107,6 +113,5 @@ void* sendStream(void* p)
 		}
 #endif
 	}
-	emptyQ(md);
 	return 0;
 }

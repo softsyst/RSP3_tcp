@@ -47,7 +47,7 @@ void* receive(void* p)
 {
 	sdrplay_api_ErrT err;
 	sdrplay_device* md = (sdrplay_device*)p;
-	cout << "**** receive thread entered.   *****" << endl;
+	std::cout << "**** receive thread entered.   *****" << endl;
 
 	try
 	{
@@ -55,7 +55,9 @@ void* receive(void* p)
 		md->writeWelcomeString();
 
 		char rxBuf[16];
-		for (;;)
+		bool forever = true;
+
+		while (forever)
 		{
 			const int cmd_length = 5;
 			memset(rxBuf, 0, 16);
@@ -69,16 +71,26 @@ void* receive(void* p)
 				if (rcvd == 0)
 				{
 					err = sdrplay_api_Uninit(md->pDevice->dev);
-					cout << "sdrplay_api_Uninit returned with: " << err << endl;
-					throw msg_exception("Socket closed");
+					std::cout << "sdrplay_api_Uninit returned with: " << err << endl;
+					forever = false;
+					break;
 				}
 				if (rcvd == SOCKET_ERROR)
 				{
-					err = sdrplay_api_Uninit(md->pDevice->dev);
-					cout << "sdrplay_api_Uninit returned with: " << err << endl;
-					throw msg_exception("Socket error");
+					if (md == 0 || md->pDevice == 0 || md->pDevice->dev == 0)
+					{
+						err = sdrplay_api_Uninit(md->pDevice->dev);
+						std::cout << "sdrplay_api_Uninit returned with: " << err << endl;
+						throw msg_exception("Socket error");
+					}
+					else
+					{
+						throw msg_exception("No device present for Uninit on Socket error");
+					}
 				}
 			}
+			if (!forever)
+				break;
 
 			int value = 0; // out parameter
 			uint8_t cmd = getCommandAndValue(rxBuf, value);
@@ -151,22 +163,22 @@ void* receive(void* p)
 	}
 	catch (exception& e)
 	{
-		cout << "*** Exception in receive :" << e.what() << endl;
+		std::cout << "*** Exception in receive :" << e.what() << endl;
 	}
 	pthread_mutex_lock(&stateLock);
 
 	err = sdrplay_api_ReleaseDevice(md->pDevice);
 	if (err == sdrplay_api_Success)
 	{
-		cout << "Device " << md->rxType << " released" << endl;
+		std::cout << "Device " << md->rxType << " released" << endl;
 		md->CommState = ST_DEVICE_RELEASED;
 		usleep(1000000);
 	}
 	else
-		cout << "*** Error on releasing device: " << sdrplay_api_GetErrorString(err) << endl;
+		std::cout << "*** Error on releasing device: " << sdrplay_api_GetErrorString(err) << endl;
 	pthread_mutex_unlock(&stateLock);
 
-	cout << "**** Rx thread terminating. ****" << endl;
+	std::cout << "**** Rx thread terminating. ****" << endl;
 	return 0;
 }
 

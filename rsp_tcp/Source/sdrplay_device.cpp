@@ -293,18 +293,34 @@ void sdrplay_device::start(SOCKET client)
 
 void sdrplay_device::selectChannel(sdrplay_api_TunerSelectT tunerId)
 {
-	if (tunerId == sdrplay_api_Tuner_A)
+	try
 	{
-		pDevice->tuner = sdrplay_api_Tuner_A;
-		pCurCh = deviceParams->rxChannelA;
+		if (tunerId == sdrplay_api_Tuner_A)
+		{
+			pDevice->tuner = sdrplay_api_Tuner_A;
+			pCurCh = deviceParams->rxChannelA;
+		}
+		else if (tunerId == sdrplay_api_Tuner_B)
+		{
+			pDevice->tuner = sdrplay_api_Tuner_B;
+			pCurCh = deviceParams->rxChannelB;
+		}
 	}
-	else if (tunerId == sdrplay_api_Tuner_B)
+	catch (const std::exception& e)
 	{
-		pDevice->tuner = sdrplay_api_Tuner_B;
-		pCurCh = deviceParams->rxChannelB;
+		cout << "Error in selectChannel : " << e.what() << endl;
 	}
 }
 
+void sdrplay_device::emptyQ()
+{
+	cout << "*** Emptying xmit Queue ***" << endl;
+	while (SafeQ.getNumEntries() > 0)
+	{
+		MemBlock* mb = SafeQ.dequeue();
+		delete mb;
+	}
+}
 
 void sdrplay_device::cleanup()
 {
@@ -314,6 +330,16 @@ void sdrplay_device::cleanup()
 		delete thrdRx;
 		thrdRx = 0;
 	}
+
+	//empty the tx Q
+	// Uninit must have run successfully here, to avoid newly filling the Q
+	 emptyQ();
+
+	//send exit message to transmitThread
+	BYTE* dummy = new BYTE[1];
+	MemBlock* mb = new MemBlock(dummy, 1, 0);
+	mb->exitMsg = true;
+	SafeQ.enqueue(mb);
 
 	//send exit message to transmitThread
 	doExitTxThread = true;

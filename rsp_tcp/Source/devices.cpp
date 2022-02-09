@@ -198,7 +198,6 @@ void devices::doListen()
 			void* status;
 			pthread_join(*pd->thrdRx, &status);
 			cout << endl << "++++ Rx thread terminated ++++" << endl;
-			//delete pd->thrdRx;
 			pd->thrdRx = 0;
 			pd->stop();
 
