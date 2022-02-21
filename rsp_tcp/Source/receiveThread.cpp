@@ -70,8 +70,10 @@ void* receive(void* p)
 
 				if (rcvd == 0)
 				{
+					std::cout << "Uninitializing... " << err << endl;
+					md->doExitTxThread = true;
+
 					err = sdrplay_api_Uninit(md->pDevice->dev);
-					std::cout << "sdrplay_api_Uninit returned with: " << err << endl;
 					forever = false;
 					break;
 				}
@@ -79,8 +81,9 @@ void* receive(void* p)
 				{
 					if (md == 0 || md->pDevice == 0 || md->pDevice->dev == 0)
 					{
+						std::cout << "Uninitializing(2)... " << err << endl;
 						err = sdrplay_api_Uninit(md->pDevice->dev);
-						std::cout << "sdrplay_api_Uninit returned with: " << err << endl;
+						std::cout << "sdrplay_api_Uninit (2) returned with: " << err << endl;
 						throw msg_exception("Socket error");
 					}
 					else

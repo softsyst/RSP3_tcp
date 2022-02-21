@@ -61,6 +61,8 @@ struct MemBlock
 
 	~MemBlock()
 	{
+		if (exitMsg)
+			return;
 		delete[] Mem;
 	}
 };

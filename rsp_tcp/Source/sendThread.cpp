@@ -88,9 +88,11 @@ void* sendStream(void* p)
 				{
 					md->cbksPerSecond = int(md->currentSamplingRateHz / numSamples); //1 sec "timer" in the error case. assumed this does not change frequently
 					delete mb;
+					mb = 0;
 					throw msg_exception("socket error " + to_string(errno));
 				}
-				delete mb;
+				if (mb != 0)
+					delete mb;
 			}
 			if (md->doExitTxThread)
 			{
