@@ -81,3 +81,5 @@
 /.vs/RSP3_TCP/project-colors.json
 /x64/Debug/RSP3_tcp.7z
 /x64/Release/RSP3_tcp.7z
+*.lib
+*.dll

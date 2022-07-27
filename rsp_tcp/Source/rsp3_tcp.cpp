@@ -44,7 +44,7 @@ using namespace std;
 // From RSP2_tcp
 // V0.9.8	Sampling rate 2.000 for ADS-B
 // V0.9.9	Bitwidth 8 Bit corrected
-string Version = "0.3.2";
+string Version = "0.3.3";
 
 bool exitRequest = false;
 pthread_mutex_t stateLock;
@@ -160,7 +160,8 @@ int main(int argc, char* argv[])
 		printf("*** Error on sdrplay_api_ApiVersion: %s\n", sdrplay_api_GetErrorString(err));
 		goto exit;
 	}
-	std::cout << "sdrplay API Version " << apiVersion << endl << endl;
+	//std::cout << "sdrplay API Version " << apiVersion << endl << endl;
+		printf("sdrplay API dll Version %.2f\n", apiVersion);
 		
 	double epsilon = 0.0001;
 
