@@ -1,5 +1,5 @@
 # RSP3_tcp
-TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver V3 : RSP1A, RSP2, RSPduo (currently single tuner)
+TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver V3 : RSP1A, RSP2, RSPduo (currently single tuner), RSPdx.
 - Compatible to rtl_tcp,
 - Runs on Windows and Linux,
 - Delivers 8- and 16- Bit I/Q Data,
