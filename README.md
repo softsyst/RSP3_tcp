@@ -1,12 +1,15 @@
 # RSP3_tcp
 TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver V3 : RSP1A, RSP2, RSPduo (currently single tuner), RSPdx.
-- Compatible to rtl_tcp,
 - Runs on Windows and Linux,
 - Delivers 8- and 16- Bit I/Q Data,
-- Compatible with SDR# (8-Bit Mode, Source RTL-SDR (TCP))
-- Working with sdrplay driver 3.09.
-- Developed as a server for QIRX V3.
+- Working with sdrplay driver 3.10 (Linux still 3.07).
+- Developed as a server for QIRX V3 and V4.
 ## History
+### V0.3.6
+- Version for Linux
+- Builds for Linux and Windows from the same sources
+- For QIRX 4.0.8 and higher, the DAB frequency accuracy is maintained with an accuracy of 1/1000 ppm (i.e. ppb), backwards compatible.
+- Cooperates with QIRX > V3.2.1
 ### V0.3.2
 - Back channel protocol for clean synchronization with the host on startup and shutdown.
 - Two-stage initialization process: 1st step: identify to the calling host, 2nd step: select the device with the requested Serial Number.
