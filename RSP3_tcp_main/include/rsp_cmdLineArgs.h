@@ -30,8 +30,6 @@ private:
 	rsp_cmdLineArgs(){}
 	int argc;
 	char** argv;
-	int tuner;
-	string serial;
 
 	map < char, int> selectors;
 	int intValue(int index, string error, int minval, int maxval);
@@ -44,6 +42,7 @@ public:
 	int Frequency = 178352000;
 	int  Tuner = 0;
 	bool Master = false;
+	bool BasicMode = false; // for rtl_tcp compatibility
 
 	/// The last four characters of the serial.
 	string Serial;

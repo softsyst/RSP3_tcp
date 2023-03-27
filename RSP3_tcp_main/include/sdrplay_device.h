@@ -35,6 +35,13 @@
 #endif
 using namespace std;
 
+#if defined(_WIN32)
+#define GETSOCKETERRNO() (WSAGetLastError())
+#else
+#define GETSOCKETERRNO() (errno)
+#endif
+
+
 enum eCommState
 {
 	ST_IDLE = 0
@@ -128,7 +135,9 @@ private:
 	rsp_cmdLineArgs* pargs=0;
 
 	friend void* receive(void* p);
-	friend void streamACallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
+	friend void* sendStream(void* p);
+
+	friend void streamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params,
 		unsigned int numSamples, unsigned int reset, void *cbContext);
 
 	friend void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
@@ -153,6 +162,7 @@ public:
 
 	SafeQueue<MemBlock*> SafeQ;
 	bool doExitTxThread = false;
+	bool basicMode = false;
 	/// <summary>
 	/// Current values, to be sent to the host
 	/// </summary>
