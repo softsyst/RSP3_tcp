@@ -57,6 +57,22 @@ void* receive(void* p)
 		char rxBuf[16];
 		bool forever = true;
 
+		if (md->basicMode) // rtl_tcp compatiblity mode, no back channel
+		{
+			std::cout << "Entering basic mode (no user device selection) " << endl;
+			md->selectDevice(0);
+			md->createChannels();
+			if (md->Initialized)
+			{
+				md->CommState = ST_DEVICE_CREATED;
+				std::cout << "Basic Mode: Device created and initialized," << endl;
+			}
+			else
+			{
+				throw msg_exception("*** Basic Mode : Device Initialization failed. ");
+			}
+		}
+
 		while (forever)
 		{
 			const int cmd_length = 5;
@@ -81,14 +97,15 @@ void* receive(void* p)
 				{
 					if (md == 0 || md->pDevice == 0 || md->pDevice->dev == 0)
 					{
+						throw msg_exception("No device present for Uninit on Socket rx error");
+					}
+					else
+					{
+						std::cout << "Socket rx Error : " << GETSOCKETERRNO() << endl;
 						std::cout << "Uninitializing(2)... " << err << endl;
 						err = sdrplay_api_Uninit(md->pDevice->dev);
 						std::cout << "sdrplay_api_Uninit (2) returned with: " << err << endl;
 						throw msg_exception("Socket error");
-					}
-					else
-					{
-						throw msg_exception("No device present for Uninit on Socket error");
 					}
 				}
 			}
@@ -97,7 +114,8 @@ void* receive(void* p)
 
 			int value = 0; // out parameter
 			uint8_t cmd = getCommandAndValue((BYTE*)rxBuf, value);
-			if (md->CommState == ST_IDLE && cmd != sdrplay_device::CMD_SET_RSP_REQUEST_ALL_SERIALS)
+			if (md->CommState == ST_IDLE && cmd != sdrplay_device::CMD_SET_RSP_REQUEST_ALL_SERIALS &&
+				md->basicMode == false)
 				continue;
 			// The ids of the commands are defined in rtl_tcp, the names had been inserted here
 			// for better readability
@@ -106,11 +124,17 @@ void* receive(void* p)
 			{
 				// First command
 			case sdrplay_device::CMD_SET_RSP_REQUEST_ALL_SERIALS: //select hardware, 1st command to receive
+				// ignore in basic mode
+				if (md->basicMode)
+					break;
 				md->CommState = ST_SERIALS_REQUESTED;
 				break;
 
 				// Second command
 			case sdrplay_device::CMD_SET_RSP_SELECT_SERIAL: //select hardware, 1st command to receive
+				// ignore in basic mode
+				if (md->basicMode)
+					break;
 				md->selectDevice(value);
 				md->createChannels();
 				if (md->Initialized)

@@ -75,6 +75,7 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 	RequestedGain = pargs->Gain;
 	currentSamplingRateHz = pargs->SamplingRate;
 	bitWidth = (eBitWidth)pargs->BitWidth;
+	basicMode = pargs->BasicMode;
 	//antenna = pargs->Antenna;
 }
 
@@ -846,7 +847,11 @@ sdrplay_api_ErrT sdrplay_device::setGain(int value)
 		double grMax = 59.0;
 		double grMin = 20.0;
 		double grunit = (grMax - grMin) / steps;
-		double gred = (steps - value); // value is max gain, NOT gr
+		double gred = (steps - value); // value is max gain index, NOT gr
+		if (gred < 0)
+			gred = 0;
+		if (gred > steps)
+			gred = steps;
 		double dgr = grMin + gred * grunit;
 		gr = gainReduction = (int)(dgr + 0.5);
 

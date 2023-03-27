@@ -68,35 +68,24 @@ void* sendStream(void* p)
 			BYTE* buf = mb->Mem;
 			//int numSamples = mb->numSamples;
 			int sent = 0;
-			//while (remaining > 0)
+
+			if (md->doExitTxThread)
 			{
-				if (md->doExitTxThread)
+				cout << "*** Exit requested (2) ***" << endl;
+				break;
+			}
+			while (remaining > 0)
+			{
+				sent = send(md->remoteClient, (const char*)buf + (buflen - remaining), remaining, 0);
+				remaining -= sent;
+				if (sent == SOCKET_ERROR)
 				{
-					cout << "*** Exit requested (2) ***" << endl;
+					std::cout << "Socket tx Error : " << GETSOCKETERRNO() << endl;
 					break;
 				}
-			//	fd_set writefds;
-			//	//struct timeval tv = { 1,90000 };//90ms timeout
-			//	struct timeval tv= {1,0};
-			//	FD_ZERO(&writefds);
-			//	FD_SET(md->remoteClient, &writefds);
-			//	int res = select(md->remoteClient + 1, NULL, &writefds, NULL, &tv);
-			//	if (res > 0)
-				while (remaining > 0)
-				{
-					sent = send(md->remoteClient, (const char*)buf + (buflen - remaining), remaining, 0);
-					remaining -= sent;
-				}
-				//else
-				//{
-				//	md->cbksPerSecond = int(md->currentSamplingRateHz / numSamples); //1 sec "timer" in the error case. assumed this does not change frequently
-				//	delete mb;
-				//	mb = 0;
-				//	throw msg_exception("socket error " + to_string(errno));
-				//}
-				if (mb != 0)
-					delete mb;
 			}
+			delete mb;
+
 			if (sent == SOCKET_ERROR || md->doExitTxThread)
 			{
 				cout << "*** Exit requested (3) ***" << endl;
@@ -118,5 +107,6 @@ void* sendStream(void* p)
 		}
 #endif
 	}
+	cout << "*** Tx thread terminating" << endl;
 	return 0;
 }

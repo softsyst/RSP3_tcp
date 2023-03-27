@@ -46,7 +46,9 @@ using namespace std;
 // V0.9.9	Bitwidth 8 Bit corrected
 // V0.3.4	API 2.10
 // V0.3.5	Timeout rx thread reduced from 1s to 50ms
-string Version = "0.3.6";
+// V0.3.6	Linux mode (QIRX only, with device selection)
+// V0.3.7   Commandline -B 1 for basic mode compatible with SDR# and DAB player
+string Version = "0.3.7";
 
 bool exitRequest = false;
 pthread_mutex_t stateLock;
@@ -137,6 +139,7 @@ int main(int argc, char* argv[])
 	//std::cout << "Antenna = " + to_string(pargs->Antenna) << endl;
 	std::cout << "Tuner = " + to_string(pargs->Tuner) << endl;
 	std::cout << "Master = " + to_string(pargs->Master) << endl;
+	std::cout << "Basic Mode (rtl_tcp compatible) = " + to_string(pargs->BasicMode) << endl;
 
 	std::cout << "\nStarting sdrplay...\n";
 

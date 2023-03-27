@@ -190,7 +190,7 @@ void devices::doListen()
 
 			cout << "Listening to " << pargs->Address.sIPAddress << ":" << to_string(pargs->Port) << endl;
 			socklen_t rlen = sizeof(remote);
-			clientSocket = accept(listenSocket, (struct sockaddr *)&remote, &rlen);
+			clientSocket = accept(listenSocket, (struct sockaddr*)&remote, &rlen);
 			if (clientSocket == INVALID_SOCKET || exitRequest)
 			{
 				cout << "Server socket accept error." << endl;
@@ -214,15 +214,16 @@ void devices::doListen()
 			pd->thrdRx = 0;
 			pd->stop();
 
-			pthread_join(*pd->thrdCtrl, &status);
-			cout << endl << "++++ Ctrl thread terminated ++++" << endl;
-			delete pd->thrdCtrl;
-			pd->thrdCtrl = 0;
-
 			pthread_join(*pd->thrdTx, &status);
 			cout << endl << "++++ Tx thread terminated ++++" << endl;
 			delete pd->thrdTx;
 			pd->thrdTx = 0;
+
+
+			/*###*/pthread_join(*pd->thrdCtrl, &status);
+			cout << endl << "++++ Ctrl thread terminated ++++" << endl;
+			delete pd->thrdCtrl;
+			pd->thrdCtrl = 0;
 
 			closesocket(clientSocket);
 			pd->remoteClient = INVALID_SOCKET;
@@ -238,7 +239,3 @@ void devices::doListen()
 	cout << "*** Exiting listening loop" << endl;
 	/**/
 }
-
-
-
-

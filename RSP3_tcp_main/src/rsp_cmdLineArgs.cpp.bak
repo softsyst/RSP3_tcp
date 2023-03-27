@@ -116,7 +116,7 @@ void rsp_cmdLineArgs::displayUsage()
 	cout << "\t[-g gain value, initial value betwee 20 and 100, default is 25]" << endl;
 	cout << "\t[-d device index, value counts from 0 to number of devices -1, default is 0]" << endl;
 	cout << "\t[-W bit width, value of 1 means 8 bit, value of 2 means 16 bit, default is 16 bit]" << endl;
-	cout << "\t[-B basic mode (rtl_tcp compatible), value counts from 0 to 1, default is 0 == false]" << endl;
+	cout << "\t[-B basic mode (rtl_tcp compatib), value counts from 0 to 1, default is 0 == false]" << endl;
 	//cout << "\t[-T antenna, value of 1 means Antenna A, value of 2 means Antenna B, default is Antenn A]" << endl;
 }
 
