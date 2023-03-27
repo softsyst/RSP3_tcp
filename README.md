@@ -24,4 +24,4 @@ TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver 
 - Back channel reports the current gain, to enable the host a calibrated frequency spectrum indication,
 
 **Credits:**  
-- Thanks to old-dab (https://github.com/old-dab) for his extensive research on these devices.  
+- Thanks to old-dab (https://github.com/old-dab) for his extensive research on these devices.
