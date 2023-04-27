@@ -91,6 +91,10 @@ int main(int argc, char* argv[])
 	rsp_cmdLineArgs* pargs = 0;
 	eErrors retCode = E_OK;
 	string sError;
+	bool res = false;
+	float apiVersion = 0.0f;
+	double epsilon = 0.0001;
+
 #ifdef _WIN32
 	WSADATA wsd;
 	int result = WSAStartup(MAKEWORD(2, 2), &wsd);
@@ -117,10 +121,6 @@ int main(int argc, char* argv[])
 	std::cout << "\nRSP_tcp V" + Version << std::endl;
 	std::cout << "Copyright (c) Clem Schmidt, qirx.softsyst.com. All rights reserved" << endl;
 	std::cout << endl;
-
-	bool res = false;
-	float apiVersion = 0.0f;
-	double epsilon = 0.0001;
 
 	pargs = new rsp_cmdLineArgs(argc, argv);
 	if (pargs->parse() != 0)

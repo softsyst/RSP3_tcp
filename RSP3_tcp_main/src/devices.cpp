@@ -24,7 +24,7 @@
 #include "common.h"
 #include "devices.h"
 #include "crc32.h"
-#ifdef __GNUC__
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>

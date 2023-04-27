@@ -60,6 +60,7 @@ enum eIndications
 	, IND_OVERLOAD_B		= 0x87            // 1 byte
 	, IND_DEVICE_RELEASED	= 0x88            // 1 byte bool
 	, IND_RSPDUO_HiZ    	= 0x89            // 1 byte bool
+	, IND_BIAST_STATE       = 0x8A			  // 0: off, 1: on
 };
 
 #ifdef _WIN32
@@ -195,6 +196,9 @@ void *ctrl_thread_fn(void *arg)
 	const char *addr = data->addr;
 	bool* do_exit = data->pDoExit;
 	int retval;
+#ifdef _WIN32
+	u_long blockmode = 1;
+#endif
 
 	memset(&local, 0, sizeof(local));
 	local.sin_family = AF_INET;
@@ -209,7 +213,6 @@ void *ctrl_thread_fn(void *arg)
 	if (retval == SOCKET_ERROR)
 		goto close;
 #ifdef _WIN32
-	u_long blockmode = 1;
 	ioctlsocket(listensocket, FIONBIO, &blockmode);
 #else
 	r = fcntl(listensocket, F_GETFL, 0);
@@ -252,6 +255,8 @@ void *ctrl_thread_fn(void *arg)
 			sdrplay_api_GainValuesT* gvals = 0;
 			float gain = 0;
 			int lnastate = 0;
+			int biasT = 0;
+			bool bias = false;
 			bool overload_a = false, overload_b = false;
 			bool rspDuoHiZ = false;
 			int buflen = 0;
@@ -297,6 +302,8 @@ void *ctrl_thread_fn(void *arg)
 				if (gvals == 0)	// too early
 					goto sleep;
 				lnastate = dev->getLNAState();
+				bias = dev->getBiasTState();
+				biasT = bias ? 1 : 0;
 
 				gain = gvals->curr;
 				if (gain > 0)
@@ -304,6 +311,7 @@ void *ctrl_thread_fn(void *arg)
 
 				len = prepareIntCommand(txbuf, len, IND_GAIN, total_gain, 2);
 				len = prepareIntCommand(txbuf, len, IND_LNA_STATE, lnastate, 1);
+				len = prepareIntCommand(txbuf, len, IND_BIAST_STATE, biasT, 1);
 
 				dev->getOverload(overload_a, overload_b);
 				len = prepareIntCommand(txbuf, len, IND_OVERLOAD_A, overload_a ? 1 : 0, 1);
