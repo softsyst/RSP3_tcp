@@ -33,7 +33,9 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #else
-//#include <winsock2.h>
+#ifdef __GNUC__
+#include <winsock2.h>
+#endif
 //#include <ws2tcpip.h>
 #include "rsp_tcp.h"
 #include <time.h>

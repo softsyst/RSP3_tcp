@@ -282,7 +282,8 @@ private:
 	sdrplay_api_ErrT err;
 
 	int sys = 40;
-	int agcPoint_dBfs = -25;
+	int agcPoint_dBfs = -60;
+	int agcPoint_dBfs_DAB = -15;
 
 	// currently commanded values
 	int currentFrequencyHz;
@@ -290,6 +291,7 @@ private:
 	int antenna = 5;
 
 	bool _rspDuoHiZ = false;
+	bool _isAdsbMode = false;
 	
 	sdrplay_api_RxChannelParamsT* pCurCh;
 
@@ -311,6 +313,7 @@ public:
 	void createCtrlThread(const char* addr, int port);
 	sdrplay_api_GainValuesT* getGainValues();
 	int getLNAState();
+	bool getBiasTState();
 	int getRxString(char* s ) const;
 	int getExportedRxType() const { return rxType + 7 ; }
 	int getBitWidth() const { return bitWidth; }
