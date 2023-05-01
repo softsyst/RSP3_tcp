@@ -933,7 +933,7 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 		// enable AGC with a setPoint of -15dBfs //optimum for DAB
 		pCurCh->ctrlParams.agc.setPoint_dBfs = agcPoint_dBfs_DAB; /*-15*/
 		pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
-		cout << "\nsdrplay_api_AgcControl 50Hz, " << agcPoint_dBfs << " dBfs returned with: " << err << endl;
+		cout << "\nsdrplay_api_AgcControl 5Hz, " << agcPoint_dBfs << " dBfs returned with: " << err << endl;
 	}
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
