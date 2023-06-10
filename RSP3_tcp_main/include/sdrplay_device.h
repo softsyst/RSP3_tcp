@@ -42,6 +42,12 @@ using namespace std;
 #endif
 
 
+enum srADSB
+{
+	SR_ADSB_LOW = 2000000
+  , SR_ADSB_HIGH = 8000000    
+};
+
 enum eCommState
 {
 	ST_IDLE = 0
@@ -174,6 +180,7 @@ public:
 	bool isStreaming;
 	bool flatGr;		// true: dont use the gain reduction tables
 	int LNAstate;		// Calculated from the RequestedGain
+	int Antenna = 5;
 
 	bool overloaded_A = false;
 	bool overloaded_B = false;
@@ -228,7 +235,7 @@ private:
 	sdrplay_api_ErrT setGain(int value);
 	sdrplay_api_ErrT setSamplingRate(int requestedSrHz);
 	sdrplay_api_ErrT stream_Uninit();
-	sdrplay_api_ErrT setAdsbMode();
+	sdrplay_api_ErrT setAdsbMode(srADSB sr);
 	sdrplay_api_ErrT setRSPduoHiZ(int value);
 
 	//Reference: rtl_tcp.c fct command_worker, line 277
@@ -262,8 +269,8 @@ private:
 
 	// Reasonable number of possible bandwidth/sampling rate combinations
 	//samplingConfiguration(int srHz, int devSrHz, sdrplay_api_Bw_MHzT bw, int decimFact, bool doDecim)
-		const int c_numSamplingConfigs = 10;
-		samplingConfiguration samplingConfigs[10] = {
+		const int c_numSamplingConfigs = 11;
+		samplingConfiguration samplingConfigs[11] = {
 		samplingConfiguration(512000, 2048000,  sdrplay_api_BW_0_300, 4, true),
 		samplingConfiguration(1024000, 2048000, sdrplay_api_BW_0_600, 2, true),
 		samplingConfiguration(2048000, 2048000, sdrplay_api_BW_1_536, 1, false),
@@ -273,8 +280,8 @@ private:
 		samplingConfiguration(4000000, 4000000, sdrplay_api_BW_1_536, 1, false),
 		samplingConfiguration(2400000, 2400000, sdrplay_api_BW_1_536, 1, false),
 		samplingConfiguration(2500000, 2500000, sdrplay_api_BW_1_536, 1, false),
-		//samplingConfiguration(2000000, 2000000, sdrplay_api_BW_8_000, 1, false)
-		samplingConfiguration(2000000, 8000000, sdrplay_api_BW_8_000, 4, true)
+		samplingConfiguration(2000000, 8000000, sdrplay_api_BW_5_000, 4, true),
+		samplingConfiguration(8000000, 8000000, sdrplay_api_BW_5_000, 1, false)
 	};
 
 
@@ -288,7 +295,6 @@ private:
 	// currently commanded values
 	int currentFrequencyHz;
 	int gainReduction;				// Calculated from the RequestedGain
-	int antenna = 5;
 
 	bool _rspDuoHiZ = false;
 	bool _isAdsbMode = false;

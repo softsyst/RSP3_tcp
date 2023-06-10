@@ -28,8 +28,8 @@ class rsp_cmdLineArgs
 {
 private:
 	rsp_cmdLineArgs(){}
-	int argc;
-	char** argv;
+	int argc = 0;
+	char** argv = 0;
 
 	map < char, int> selectors;
 	int intValue(int index, string error, int minval, int maxval);
@@ -51,7 +51,8 @@ public:
 	int Gain = 25;
 	int SamplingRate = 2048000;
 	int BitWidth = 2; //16 Bit
-	//mir_sdr_RSPII_AntennaSelectT Antenna = mir_sdr_RSPII_ANTENNA_A;
+	int LNAstate = 3; 
+	int Antenna = 5; 
 	int requestedDeviceIndex = 0;
 
 	rsp_cmdLineArgs(int argc, char** argv);
