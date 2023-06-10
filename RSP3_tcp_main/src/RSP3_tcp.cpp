@@ -48,7 +48,8 @@ using namespace std;
 // V0.3.5	Timeout rx thread reduced from 1s to 50ms
 // V0.3.6	Linux mode (QIRX only, with device selection)
 // V0.3.7   Commandline -B 1 for basic mode compatible with SDR# and DAB player
-string Version = "0.3.7";
+// V0.3.8   Commandline -L <x> for LNA state 0 <= x <= 15
+string Version = "0.3.8";
 
 bool exitRequest = false;
 pthread_mutex_t stateLock;
@@ -134,9 +135,10 @@ int main(int argc, char* argv[])
 	std::cout << "Port Number = " + to_string(pargs->Port) << endl;
 	std::cout << "Sampling Rate = " + to_string(pargs->SamplingRate) << endl;
 	std::cout << "Frequency = " + to_string(pargs->Frequency) << endl;
+	std::cout << "LNA State = " + to_string(pargs->LNAstate) << ". Might be changed by the Gain value setting."<< endl;
 	std::cout << "Gain = " + to_string(pargs->Gain) << endl;
 	std::cout << "BitWidth = " + to_string(pargs->BitWidth) << endl;
-	//std::cout << "Antenna = " + to_string(pargs->Antenna) << endl;
+	std::cout << "Antenna = " + to_string(pargs->Antenna) << endl;
 	std::cout << "Tuner = " + to_string(pargs->Tuner) << endl;
 	std::cout << "Master = " + to_string(pargs->Master) << endl;
 	std::cout << "Basic Mode (rtl_tcp compatible) = " + to_string(pargs->BasicMode) << endl;

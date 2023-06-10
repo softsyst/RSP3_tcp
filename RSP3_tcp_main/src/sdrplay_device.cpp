@@ -76,7 +76,8 @@ void sdrplay_device::init(rsp_cmdLineArgs* pargs)
 	currentSamplingRateHz = pargs->SamplingRate;
 	bitWidth = (eBitWidth)pargs->BitWidth;
 	basicMode = pargs->BasicMode;
-	//antenna = pargs->Antenna;
+	LNAstate = pargs->LNAstate;
+	Antenna = pargs->Antenna;
 }
 
 
@@ -726,7 +727,7 @@ sdrplay_api_ErrT sdrplay_device::createChannels(int srTableIx)
 	}
 	int sr = samplingConfigs[ix].deviceSamplingRateHz; // initially set in init
 	deviceParams->devParams->fsFreq.fsHz = sr;
-	if (sr%2000000 == 0) //then assume ads-b
+	if (sr == SR_ADSB_LOW || sr == SR_ADSB_HIGH ) //then assume ads-b
 	{
 		_isAdsbMode = true;
 	}
@@ -739,12 +740,12 @@ sdrplay_api_ErrT sdrplay_device::createChannels(int srTableIx)
 	pCurCh->ctrlParams.decimation.decimationFactor = decimationFactor;
 	pCurCh->ctrlParams.decimation.enable = decimationFactor == 1 ? 0 : 1;
 	//pCurCh->ctrlParams.decimation.wideBandSignal = currentSamplingRateHz == 2000000 ? 1 : 0;
-	pCurCh->tunerParams.rfFreq.rfHz = 1090000;
+	pCurCh->tunerParams.rfFreq.rfHz = 222064000;// 1090000;
 
 	pCurCh->ctrlParams.agc.setPoint_dBfs = agcPoint_dBfs;
 	pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
-	pCurCh->tunerParams.gain.gRdB = 20;// gainReduction;
-	pCurCh->tunerParams.gain.LNAstate = 0;// LNAstate;
+	pCurCh->tunerParams.gain.gRdB =  gainReduction;
+	pCurCh->tunerParams.gain.LNAstate = LNAstate;
 
 	// next doesn't work in master/slave mode, 
 	//deviceParams->rxChannelB->tunerParams.ifType = sdrplay_api_IF_Zero;
@@ -769,12 +770,17 @@ sdrplay_api_ErrT sdrplay_device::createChannels(int srTableIx)
 		int err;
 		if (_isAdsbMode)
 		{
-			err = setAdsbMode();
+			err = setAdsbMode((srADSB)sr);
 			if (err != 0)
 				_isAdsbMode = false;
 		}
 		Initialized = true;
 		printf("Adsb Mode = %s\n", _isAdsbMode ? "on" : "off");
+	}
+	if (err == sdrplay_api_Success)
+	{
+		setAntenna(Antenna);
+		setAGC(true);
 	}
 	//double fs = deviceParams->devParams->fsFreq.fsHz;
 	return errInit;
@@ -851,7 +857,11 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	pCurCh->ctrlParams.dcOffset.IQenable = 1;
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Ctrl_DCoffsetIQimbalance, sdrplay_api_Update_Ext1_None);
-
+	if (err == sdrplay_api_Success)
+	{
+		setAntenna(Antenna);
+		setAGC(true);
+	}
 	return errInit;
 }
 
@@ -929,11 +939,15 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 	}
 	else
 	{
+		int lnastate = pCurCh->tunerParams.gain.LNAstate;
+		cout << "LNA state before set AGC: " << lnastate << endl;
 		AGC_A = true;
 		// enable AGC with a setPoint of -15dBfs //optimum for DAB
 		pCurCh->ctrlParams.agc.setPoint_dBfs = agcPoint_dBfs_DAB; /*-15*/
 		pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
 		cout << "\nsdrplay_api_AgcControl 5Hz, " << agcPoint_dBfs_DAB << " dBfs returned with: " << err << endl;
+		lnastate = pCurCh->tunerParams.gain.LNAstate;
+		cout << "LNA state after set AGC: " << lnastate << endl;
 	}
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
@@ -1043,17 +1057,18 @@ sdrplay_api_ErrT sdrplay_device::setSamplingRate(int requestedSrHz)
 	}
 	else
 	{
-
+		printf("Invalid sampling rate %d\n", requestedSrHz);
+		return sdrplay_api_InvalidParam;
 	}
-	if (requestedSrHz == 2000000) //then assume ads-b
+	if (requestedSrHz == SR_ADSB_LOW || requestedSrHz == SR_ADSB_HIGH) //then assume ads-b
 	{
-		setAdsbMode();
+		setAdsbMode((srADSB)requestedSrHz);
 		_isAdsbMode = true;
 	}
 	else
 		_isAdsbMode = false;
 
-	printf("Adsb Mode = &s\n", _isAdsbMode ? "on" : "off");
+	printf("Adsb Mode = %s\n", _isAdsbMode ? "on" : "off");
 	return err;
 }
 
@@ -1193,18 +1208,38 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 		cout << "BiasT setting: " << value << endl;
 	return err;
 }
-sdrplay_api_ErrT sdrplay_device::setAdsbMode()
+sdrplay_api_ErrT sdrplay_device::setAdsbMode(srADSB sr)
 {
-	//pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_NO_DECIMATION_BANDPASS_2MHZ;
-	pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_DECIMATION; // Andy's advice
-	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
-			sdrplay_api_Update_Ctrl_AdsbMode, sdrplay_api_Update_Ext1_None);
+	if (sr == SR_ADSB_LOW)
+	{
+		//pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_NO_DECIMATION_BANDPASS_2MHZ;
+		pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_DECIMATION; // Andy's advice
+		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+				sdrplay_api_Update_Ctrl_AdsbMode, sdrplay_api_Update_Ext1_None);
 
-	cout << "\nSet ADSB mode returned with: " << err << endl;
-	if (err != sdrplay_api_Success)
-		cout << "ADSB mode  error: " << err << endl;
+		cout << "\nSet ADSB mode returned with: " << err << endl;
+		if (err != sdrplay_api_Success)
+			cout << "ADSB mode  error: " << err << endl;
 
-	return err;
+		return err;
+	}
+	else if (sr == SR_ADSB_HIGH)
+	{
+		pCurCh->ctrlParams.adsbMode = sdrplay_api_ADSB_NO_DECIMATION_LOWPASS;
+		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
+				sdrplay_api_Update_Ctrl_AdsbMode, sdrplay_api_Update_Ext1_None);
+
+		cout << "\nSet ADSB mode returned with: " << err << endl;
+		if (err != sdrplay_api_Success)
+			cout << "ADSB mode  error: " << err << endl;
+
+		return err;
+	}
+	else
+	{
+		cout << "\nSet ADSB mode returned with: " << err << endl;
+		return sdrplay_api_InvalidParam;
+	}
 }
 
 // 1: on
@@ -1292,6 +1327,12 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 			}
 			else if (value == 6) //Tuner B requested
 			{
+				if (basicMode)
+				{
+					cout << "Tuner B not possible in Basic mode." << endl;
+					err = sdrplay_api_InvalidParam;
+					break;
+				}
 				if (pDevice->tuner != sdrplay_api_Tuner_B)
 				{
 					err = sdrplay_api_SwapRspDuoActiveTuner(pDevice->dev, &pDevice->tuner, sdrplay_api_RspDuo_AMPORT_2);// , sdrplay_api_RspDuo_AMPORT_1);
@@ -1309,20 +1350,24 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 					(sdrplay_api_ReasonForUpdateT)(sdrplay_api_Update_None),
 					sdrplay_api_Update_RspDx_AntennaControl);
 			}
+			break;
 
 		default:
 			err = sdrplay_api_InvalidParam;
 			break;
 	}
 
-	cout << "\nAntenna control  with: " << err << endl;
+	cout << "\nAntenna control returned with: " << err << endl;
 	if (err != sdrplay_api_Success)
 	{
 		cout << "Antenna control setting error: " << err << endl;
 		return err;
 	}
 	else
-		cout <<" Antenna control succeeded: " << value << endl;
+	{
+		cout <<" Setting Antenna #" << value << "succeeded" << endl;
+		Antenna = value;
+	}
 	return err;
 }
 

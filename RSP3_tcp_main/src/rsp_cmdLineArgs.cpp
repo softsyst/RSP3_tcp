@@ -112,12 +112,13 @@ void rsp_cmdLineArgs::displayUsage()
 	cout << "Usage: \t[-a listen address, default is 127.0.0.1]" << endl;
 	cout << "\t[-p listen port, default is 7890]" << endl;
 	cout << "\t[-f frequency [Hz], default is 178352000Hz]" << endl;
-	cout << "\t[-s sampling rate [Hz], allowed values are 512000, 1024000, 2048000, 4096000, 8192000, default is 2048000]" << endl;
-	cout << "\t[-g gain value, initial value betwee 20 and 100, default is 25]" << endl;
+	cout << "\t[-s sampling rate [Hz], allowed values are 512000, 1024000, 2000000, 2048000, 4096000, 8192000, default is 2048000]" << endl;
+	cout << "\t[-g gain value, initial value betwee 20 and 99, default is 25]" << endl;
 	cout << "\t[-d device index, value counts from 0 to number of devices -1, default is 0]" << endl;
 	cout << "\t[-W bit width, value of 1 means 8 bit, value of 2 means 16 bit, default is 16 bit]" << endl;
 	cout << "\t[-B basic mode (rtl_tcp compatible), value counts from 0 to 1, default is 0 == false]" << endl;
-	//cout << "\t[-T antenna, value of 1 means Antenna A, value of 2 means Antenna B, default is Antenn A]" << endl;
+	cout << "\t[-L LNA state, value counts from 0 (highest gain) to 15 (lowest gain), default is 3]" << endl;
+	cout << "\t[-T Antenna, RSPdx: A|B|C = 0|1|2; RSP2: A|B = 5|6; RSPduo: Basic mode only Tuner 1 = 5|6]" << endl;
 }
 
 
@@ -126,6 +127,8 @@ int rsp_cmdLineArgs::parse()
 {
 	int masterslave = 0;
 	int basicMode = false;
+	int lnaState = 3;
+	int antenna = 0;
 	Master = 0;
 	map<char, int>::iterator it;
 	if (argc == 2 && argv[1][0] == '?')
@@ -165,15 +168,24 @@ int rsp_cmdLineArgs::parse()
 			basicMode = intValue(it->second, "Invalid Basic Mode Value ", 0, 1);
 			BasicMode = basicMode == 0? false: true;
 			break;
+		case 'L':
+			lnaState = intValue(it->second, "Invalid IP Address ", 0, 15);
+			if (lnaState == 0)
+				goto exit;
+			LNAstate = lnaState;
+			break;
 		case 'a':
 			ipa = ipAddValue(it->second, "Invalid IP Address ");
 			if (ipa == 0)
 				goto exit;
 			Address = *ipa;
 			break;
-		//case 'T':
-		//	Antenna = static_cast<mir_sdr_RSPII_AntennaSelectT>(intValue(it->second, "Invalid Antenna Value ", 1, 2) + 4);
-		//	break;
+		case 'T':
+			antenna = intValue(it->second, "Invalid Antenna Value ", 0, 6);
+			if (antenna == -1 || antenna == 3 || antenna == 4)
+				goto exit;
+			Antenna = antenna;
+			break;
 
 		//typedef enum
 		//{

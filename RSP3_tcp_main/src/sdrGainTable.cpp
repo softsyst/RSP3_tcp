@@ -573,7 +573,8 @@ bool gainConfiguration::calculateGrValues(int flatValue, int rxtype, int& LNAsta
 
 		//search the lnastates table from 0 until the first value in range is found
 		//Take it as the gr corresponding to the lnastate
-		for (int i = 0; i < lnaStates; i++)
+		//for (int i = 0; i < lnaStates; i++)
+		for (int i = lnaStates-1; i >= 0; i--)
 		{
 			int val = gainTable[i][myBand];
 			gr = flatGr - val;
