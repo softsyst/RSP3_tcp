@@ -122,6 +122,7 @@ void* receive(void* p)
 			//int gain = md->RequestedGain;
 			switch (cmd)
 			{
+
 				// First command
 			case sdrplay_device::CMD_SET_RSP_REQUEST_ALL_SERIALS: //select hardware, 1st command to receive
 				// ignore in basic mode
