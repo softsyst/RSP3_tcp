@@ -5,6 +5,8 @@ TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver 
 - Working with sdrplay driver 3.10 (Linux still 3.07).
 - Developed as a server for QIRX V3 and V4, and with reduced functionality for other apps like SDR# (Source RTL-SDR TCP) or DAB Player (commandline -RtlTcp)
 ## History
+### V0.3.9, June 2023
+- RSP band notch filters for DAB, WFM, AM included.
 ### V0.3.8, June 2023
 - New commandline parameter -T x to select the antenna input on RSPdx, RSP2.
 - Automatic enabling of the AGC
