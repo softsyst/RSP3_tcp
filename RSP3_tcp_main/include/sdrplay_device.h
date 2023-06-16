@@ -58,6 +58,14 @@ enum eCommState
 	, ST_DEVICE_RELEASED 	  
 };
 
+enum eNotch
+{
+	NOTCH_NULL = 0
+	, NOTCH_RF = 1
+	, NOTCH_AM = 2
+	, NOTCH_DAB = 3
+};
+
 struct MemBlock
 {
 	BYTE* Mem;
@@ -230,6 +238,7 @@ private:
 	sdrplay_api_ErrT setFrequencyCorrection1000(int value);
 	sdrplay_api_ErrT setBiasT(int value);
 	sdrplay_api_ErrT setAntenna(int value);
+	sdrplay_api_ErrT setNotch(int value);
 	sdrplay_api_ErrT setLNAState(int value);
 	sdrplay_api_ErrT setAGC(bool on);
 	sdrplay_api_ErrT setGain(int value);
@@ -260,6 +269,16 @@ private:
 		, CMD_SET_RSP_REQUEST_ALL_SERIALS = 0x80      // request for all serials to be transmitted via back channel
 		, CMD_SET_RSP_SELECT_SERIAL = 0x81    // value is four bytes CRC-32 of the requested serial number
 		, CMD_SET_RSP_DUO_HI_Z = 0x82         // 1/0: HiZ on/off for the RSPduo
+		, CMD_SET_RSP_NOTCH = 0x84            // High Word: 0 disable, 1 enable
+											  // Low word:
+												//	enum eNotch
+												//{
+												//	NOTCH_NULL = 0
+												//	, NOTCH_RF = 1
+												//	, NOTCH_AM = 2
+												//	, NOTCH_DAB = 3
+												//};
+
 	};
 
 	// This server is able to stream native 16-bit data (of "short" type)
