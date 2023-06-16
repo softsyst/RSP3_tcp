@@ -94,7 +94,7 @@ int sdrplay_device::prepareSerialsList(BYTE* buf)
 	serialCRCs = devices::instance().getSerialCRCs();
 	sdrplayDevices = devices::instance().getSdrplayDevices();
 
-	cout << "Preparing device serials list." << endl;
+	std::cout << "Preparing device serials list." << endl;
 	BYTE* p = buf;
 	const int SERLEN = 64;
 	for (int i = 0; i < numDevices; i++)
@@ -151,7 +151,7 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 			string devserno = string(pd->SerNo);
 			if (crc == serialCRCs[i] || crc== 0 )
 			{
-				cout << "Device with Serial " << sdrplayDevices[i].SerNo << " selected." << endl;
+				std::cout << "Device with Serial " << sdrplayDevices[i].SerNo << " selected." << endl;
 				//pd->tuner = sdrplay_api_Tuner_A;
 				setDevice(pd); //pDevice
 				if (pd->hwVer == SDRPLAY_RSPduo_ID)
@@ -227,7 +227,7 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 		throw msg_exception("Error in tuner initialisation.");
 	}
 
-	cout << "Tuner " << pd->tuner << " selected";
+	std::cout << "Tuner " << pd->tuner << " selected";
 	return sdrplay_api_Success;
 }
 
@@ -260,7 +260,7 @@ void sdrplay_device::start(SOCKET client)
 {
 	remoteClient = client;
 
-	cout << endl << "Starting..." << endl;
+	std::cout << endl << "Starting..." << endl;
 	// create the control thread and its socket communication
 	createCtrlThread(pargs->Address.sIPAddress.c_str(), pargs->Port + 1);
 
@@ -312,13 +312,13 @@ void sdrplay_device::selectChannel(sdrplay_api_TunerSelectT tunerId)
 	}
 	catch (const std::exception& e)
 	{
-		cout << "Error in selectChannel : " << e.what() << endl;
+		std::cout << "Error in selectChannel : " << e.what() << endl;
 	}
 }
 
 void sdrplay_device::emptyQ()
 {
-	cout << "*** Emptying xmit Queue ***" << endl;
+	std::cout << "*** Emptying xmit Queue ***" << endl;
 	while (SafeQ.getNumEntries() > 0)
 	{
 		MemBlock* mb = SafeQ.dequeue();
@@ -354,7 +354,7 @@ void sdrplay_device::stop()
 {
 	if (!started)
 	{
-		cout << "Already Stopped. Nothing to do here.";
+		std::cout << "Already Stopped. Nothing to do here." << endl;;
 		return;
 	}
 	cleanup();
@@ -517,26 +517,26 @@ void eventCallback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
 			md->overloaded_A = true;
 			int gr = md->pCurCh->tunerParams.gain.gRdB;
 			int lnastate = md->pCurCh->tunerParams.gain.LNAstate;
-			cout << "Overload detected on tuner A with lnastate " << lnastate << " and grdB: " << gr << endl;
+			std::cout << "Overload detected on tuner A with lnastate " << lnastate << " and grdB: " << gr << endl;
 		}
 		else if (tuner == sdrplay_api_Tuner_A && params->powerOverloadParams.powerOverloadChangeType ==
 			sdrplay_api_Overload_Corrected)
 		{
 			md->overloaded_A = false;
-			cout << "Overload corrected on tuner A" << endl;
+			std::cout << "Overload corrected on tuner A" << endl;
 		}
 		else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
 			sdrplay_api_Overload_Detected)
 		{
 			md->overloaded_B = true;
-			cout << "Overload detected on tuner B" << endl;
+			std::cout << "Overload detected on tuner B" << endl;
 		}
 
 		else if (tuner == sdrplay_api_Tuner_B && params->powerOverloadParams.powerOverloadChangeType ==
 			sdrplay_api_Overload_Corrected)
 		{
 			md->overloaded_B = false;
-			cout << "Overload corrected on tuner B" << endl;
+			std::cout << "Overload corrected on tuner B" << endl;
 		}
 
 		// Send update message to acknowledge power overload message received
@@ -583,7 +583,7 @@ void streamACallback(short* xi, short* xq, sdrplay_api_StreamCbParamsT* params,
 {
 	if (exitRequest)
 	{
-		cout << "Exit request in streamACallback" << endl;
+		std::cout << "Exit request in streamACallback" << endl;
 		return;
 	}
 	if (reset)
@@ -597,7 +597,7 @@ void streamBCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 {
 	if (exitRequest)
 	{
-		cout << "Exit request in streamBCallback" << endl;
+		std::cout << "Exit request in streamBCallback" << endl;
 		return;
 	}
 	if (reset)
@@ -619,13 +619,13 @@ unsigned int areDiffSamples(sdrplay_device* ctx, sdrplay_api_StreamCbParamsT *pa
 	else if (ctx->_expectedFirstSampleNum < par->firstSampleNum) // then callbacks lost?
 	{
 		diff = par->firstSampleNum  - ctx->_expectedFirstSampleNum;
-		cout << "Expected 1st spl num = " << ctx->_expectedFirstSampleNum << ", rcvd was " << par->firstSampleNum << ", Diff = " << diff << endl;
+		std::cout << "Expected 1st spl num = " << ctx->_expectedFirstSampleNum << ", rcvd was " << par->firstSampleNum << ", Diff = " << diff << endl;
 		ctx->_expectedFirstSampleNum = par->firstSampleNum + par->numSamples;
 	}
 	else if (ctx->_expectedFirstSampleNum > par->firstSampleNum) //?? sth. repeated?
 	{
 		diff = ctx->_expectedFirstSampleNum - par->firstSampleNum;
-		cout << "Expected 1st spl num = " << ctx->_expectedFirstSampleNum << ", rcvd was " << par->firstSampleNum << ", Diff2 = " << diff << endl;
+		std::cout << "Expected 1st spl num = " << ctx->_expectedFirstSampleNum << ", rcvd was " << par->firstSampleNum << ", Diff2 = " << diff << endl;
 		ctx->_expectedFirstSampleNum = par->firstSampleNum + par->numSamples;
 	}
 	else
@@ -658,7 +658,7 @@ void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 			if (!md->cbkTimerStarted)
 			{
 				md->cbkTimerStarted = true;
-				cout << "Discarding samples for one second\n";
+				std::cout << "Discarding samples for one second\n";
 			}
 			goto out;
 		}
@@ -668,7 +668,7 @@ void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 		} 
 		if (md->remoteClient == INVALID_SOCKET)
 		{
-			cout << "Invalid remote socket\n";
+			std::cout << "Invalid remote socket\n";
 			goto out;
 		}
 
@@ -688,7 +688,7 @@ void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 	}
 	catch (exception& e)
 	{
-		cout << "Error in streaming callback :" << e.what() <<  endl;
+		std::cout << "Error in streaming callback :" << e.what() <<  endl;
 	}
 out:
 #if defined(TIME_MEAS2) && defined (_WIN32)
@@ -708,21 +708,22 @@ sdrplay_api_ErrT sdrplay_device::createChannels(int srTableIx)
 
 	if (!RSPGainValuesFromRequestedGain(RequestedGain, rxType, LNAstate, gainReduction))
 	{
-		cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << RequestedGain << endl;
-		cout << "Program cannot continue" << endl;
+		std::cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << RequestedGain << endl;
+		std::cout << "Program cannot continue" << endl;
 		return sdrplay_api_Fail;
 	}
-	cout << "\n Using LNA State: " << LNAstate << endl;
-	cout << " Using Gain Reduction: " << gainReduction << endl;
+	std::cout << "\n Using LNA State: " << LNAstate << endl;
+	std::cout << " Using Gain Reduction: " << gainReduction << endl;
 
 	// next doesn't work in master/slave mode, 
 	pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
+	//pCurCh->tunerParams.ifType = sdrplay_api_IF_2_048;
 	//pCurCh->tunerParams.ifType = sdrplay_api_IF_0_450;
 
 	int ix = srTableIx;
 	if (ix < 0)
 	{
-		cout << "Invalid sampling rate: " << currentSamplingRateHz << endl;
+		std::cout << "Invalid sampling rate: " << currentSamplingRateHz << endl;
 		return sdrplay_api_InvalidParam;
 	}
 	int sr = samplingConfigs[ix].deviceSamplingRateHz; // initially set in init
@@ -763,7 +764,7 @@ sdrplay_api_ErrT sdrplay_device::createChannels(int srTableIx)
 	cbFns.EventCbFn = eventCallback;
 
 	sdrplay_api_ErrT errInit = sdrplay_api_Init(pDevice->dev, &cbFns, this);
-	cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
+	std::cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
 	if (errInit == sdrplay_api_Success)
 	{
 		
@@ -800,22 +801,23 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 
 	if (!RSPGainValuesFromRequestedGain(RequestedGain, rxType, LNAstate, gainReduction))
 	{
-		cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << RequestedGain << endl;
-		cout << "Program cannot continue" << endl;
+		std::cout << "\nCannot retrieve LNA state and Gain Reduction from requested gain value " << RequestedGain << endl;
+		std::cout << "Program cannot continue" << endl;
 		return sdrplay_api_Fail;
 	}
-	cout << "\n Using LNA State: " << LNAstate << endl;
-	cout << " Using Gain Reduction: " << gainReduction << endl;
+	std::cout << "\n Using LNA State: " << LNAstate << endl;
+	std::cout << " Using Gain Reduction: " << gainReduction << endl;
 
 	// next doesn't work in master/slave mode, 
 	pCurCh->tunerParams.ifType = sdrplay_api_IF_Zero;
+	//pCurCh->tunerParams.ifType = sdrplay_api_IF_2_048;
 	//pCurCh->tunerParams.ifType = sdrplay_api_IF_0_450;
 
 	deviceParams->devParams->fsFreq.fsHz = currentSamplingRateHz; // initially set in init
 	int ix = getSamplingConfigurationTableIndex(int(currentSamplingRateHz));
 	if (ix < 0)
 	{
-		cout << "Invalid sampling rate: " << currentSamplingRateHz << endl;
+		std::cout << "Invalid sampling rate: " << currentSamplingRateHz << endl;
 		return sdrplay_api_InvalidParam;
 	}
 
@@ -848,7 +850,7 @@ sdrplay_api_ErrT sdrplay_device::createChannels()
 	cbFns.EventCbFn = eventCallback;
 
 	sdrplay_api_ErrT errInit = sdrplay_api_Init(pDevice->dev, &cbFns, this);
-	cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
+	std::cout << "\nsdrplay_api_StreamInit returned with: " << errInit << endl;
 	if (errInit == sdrplay_api_Success)
 		Initialized = true;
 	//double fs = deviceParams->devParams->fsFreq.fsHz;
@@ -873,16 +875,16 @@ sdrplay_api_ErrT sdrplay_device::setFrequency(int valueHz)
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
 
-	cout << "\nsdrplay_api_Update_Tuner_Frf returned with: " << err << endl;
+	std::cout << "\nsdrplay_api_Update_Tuner_Frf returned with: " << err << endl;
 	if (err != sdrplay_api_Success)
 	{
-		cout << "*** Error on Frequency setting: " << sdrplay_api_GetErrorString(err) << endl;
-		cout << "Requested Frequency was: " << +valueHz << endl;
+		std::cout << "*** Error on Frequency setting: " << sdrplay_api_GetErrorString(err) << endl;
+		std::cout << "Requested Frequency was: " << +valueHz << endl;
 	}
 	else
 	{
 		currentFrequencyHz = valueHz;
-		cout << "Frequency set to (Hz): " << valueHz << endl;
+		std::cout << "Frequency set to (Hz): " << valueHz << endl;
 	}
 	return err;
 }
@@ -922,7 +924,7 @@ sdrplay_api_ErrT sdrplay_device::setGain(int value)
 			sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
 		if (VERBOSE)
 		{
-			cout << "Requested Gain of " << value << "   resulted in " << gr << " dB gain reduction." << endl;
+			std::cout << "Requested Gain of " << value << "   resulted in " << gr << " dB gain reduction." << endl;
 		}
 	}
 	return err;
@@ -935,26 +937,26 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 	{
 		AGC_A = false;
 		pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
-		cout << "\nAGC OFF returned with: " << err << endl;
+		std::cout << "\nAGC OFF returned with: " << err << endl;
 	}
 	else
 	{
 		int lnastate = pCurCh->tunerParams.gain.LNAstate;
-		cout << "LNA state before set AGC: " << lnastate << endl;
+		std::cout << "LNA state before set AGC: " << lnastate << endl;
 		AGC_A = true;
 		// enable AGC with a setPoint of -15dBfs //optimum for DAB
 		pCurCh->ctrlParams.agc.setPoint_dBfs = agcPoint_dBfs_DAB; /*-15*/
 		pCurCh->ctrlParams.agc.enable = sdrplay_api_AGC_5HZ;
-		cout << "\nsdrplay_api_AgcControl 5Hz, " << agcPoint_dBfs_DAB << " dBfs returned with: " << err << endl;
+		std::cout << "\nsdrplay_api_AgcControl 5Hz, " << agcPoint_dBfs_DAB << " dBfs returned with: " << err << endl;
 		lnastate = pCurCh->tunerParams.gain.LNAstate;
-		cout << "LNA state after set AGC: " << lnastate << endl;
+		std::cout << "LNA state after set AGC: " << lnastate << endl;
 	}
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
 
 	if (err != sdrplay_api_Success)
 	{
-		cout << "SetAGC failed." << endl;
+		std::cout << "SetAGC failed." << endl;
 	}
 
 	return err;
@@ -974,12 +976,12 @@ sdrplay_api_ErrT sdrplay_device::setLNAState(int value)
 
 	if (value < 0 || value >= lnaStates)
 	{
-		cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " available." << endl;
+		std::cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " available." << endl;
 		return sdrplay_api_OutOfRange;
 	}
 	if ( gcfg.IsGrInvalid(rxType, value, band))
 	{
-		cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " is invalid." << endl;
+		std::cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " is invalid." << endl;
 		return sdrplay_api_OutOfRange;
 	}
 
@@ -992,7 +994,7 @@ sdrplay_api_ErrT sdrplay_device::setLNAState(int value)
 		sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
 	lnastate = pCurCh->tunerParams.gain.LNAstate;
 
-	cout << "New lnastate returned with " << err << " and new lnastate " << lnastate << endl;
+	std::cout << "New lnastate returned with " << err << " and new lnastate " << lnastate << endl;
 	return err;
 }
 
@@ -1023,7 +1025,7 @@ bool sdrplay_device::getBiasTState()
 	}
 	catch (const std::exception& e)
 	{
-		cout << "\nBiasT request error: " << e.what() << endl;
+		std::cout << "\nBiasT request error: " << e.what() << endl;
 	}
 	return val == 1 ? true : false;
 }
@@ -1035,18 +1037,18 @@ int sdrplay_device::getLNAState()
 }
 sdrplay_api_ErrT sdrplay_device::setSamplingRate(int requestedSrHz)
 {
-	cout << "New Samplingrate requested: " << requestedSrHz << endl;
+	std::cout << "New Samplingrate requested: " << requestedSrHz << endl;
 
 	if (Initialized)
 	{
 		sdrplay_api_ErrT err = sdrplay_api_Uninit(pDevice->dev);
 		if (err != sdrplay_api_Success)
 		{
-			cout << "***Uninitialize failed!" << endl;
+			std::cout << "***Uninitialize failed!" << endl;
 			return err;
 		}
 		else
-			cout << "Uninitialize successful!" << endl;
+			std::cout << "Uninitialize successful!" << endl;
 	}
 	int ix = getSamplingConfigurationTableIndex(requestedSrHz);
 	if (ix >= 0)
@@ -1103,10 +1105,10 @@ sdrplay_api_ErrT sdrplay_device::setFrequencyCorrection(int value)
 		sdrplay_api_Update_Dev_Ppm, sdrplay_api_Update_Ext1_None);
 
 	if (err != sdrplay_api_Success)
-		cout << "PPM setting error: " << err << endl;
+		std::cout << "PPM setting error: " << err << endl;
 	else
-	cout << "\nsdrplay_api_SetPpm returned with: " << err << endl;
-		cout << "PPM correction: " << value << endl;
+		std::cout << "\nsdrplay_api_SetPpm returned with: " << err << endl;
+	std::cout << "PPM correction: " << value << endl;
 	return err;
 }
 
@@ -1120,14 +1122,14 @@ sdrplay_api_ErrT sdrplay_device::setFrequencyCorrection100(int value)
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Dev_Ppm, sdrplay_api_Update_Ext1_None);
 
-	cout << "\nsdrplay_api_SetPpm returned with: " << err << endl;
+	std::cout << "\nsdrplay_api_SetPpm returned with: " << err << endl;
 	if (err != sdrplay_api_Success)
 	{
-		cout << "PPM setting error: " << err << endl;
+		std::cout << "PPM setting error: " << err << endl;
 		return err;
 	}
 	else
-		cout << "PPM correction: " << valPpm << endl;
+		std::cout << "PPM correction: " << valPpm << endl;
 	return err;
 }
 
@@ -1140,14 +1142,14 @@ sdrplay_api_ErrT sdrplay_device::setFrequencyCorrection1000(int value)
 	err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Dev_Ppm, sdrplay_api_Update_Ext1_None);
 
-	cout << "\nsdrplay_api_SetPpm returned with: " << err << endl;
+	std::cout << "\nsdrplay_api_SetPpm returned with: " << err << endl;
 	if (err != sdrplay_api_Success)
 	{
-		cout << "PPM setting error: " << err << endl;
+		std::cout << "PPM setting error: " << err << endl;
 		return err;
 	}
 	else
-		cout << "PPM correction: " << valPpm << endl;
+		std::cout << "PPM correction: " << valPpm << endl;
 	return err;
 
 
@@ -1201,11 +1203,11 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 			break;
 	}
 
-	cout << "\nsdrplay_api_xxx_BiasT returned with: " << err << endl;
+	std::cout << "\nsdrplay_api_xxx_BiasT returned with: " << err << endl;
 	if (err != sdrplay_api_Success)
-		cout << "BiasT setting error: " << err << endl;
+		std::cout << "BiasT setting error: " << err << endl;
 	else
-		cout << "BiasT setting: " << value << endl;
+		std::cout << "BiasT setting: " << value << endl;
 	return err;
 }
 sdrplay_api_ErrT sdrplay_device::setAdsbMode(srADSB sr)
@@ -1217,9 +1219,9 @@ sdrplay_api_ErrT sdrplay_device::setAdsbMode(srADSB sr)
 		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_Ctrl_AdsbMode, sdrplay_api_Update_Ext1_None);
 
-		cout << "\nSet ADSB mode returned with: " << err << endl;
+		std::cout << "\nSet ADSB mode returned with: " << err << endl;
 		if (err != sdrplay_api_Success)
-			cout << "ADSB mode  error: " << err << endl;
+			std::cout << "ADSB mode  error: " << err << endl;
 
 		return err;
 	}
@@ -1229,15 +1231,15 @@ sdrplay_api_ErrT sdrplay_device::setAdsbMode(srADSB sr)
 		err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_Ctrl_AdsbMode, sdrplay_api_Update_Ext1_None);
 
-		cout << "\nSet ADSB mode returned with: " << err << endl;
+		std::cout << "\nSet ADSB mode returned with: " << err << endl;
 		if (err != sdrplay_api_Success)
-			cout << "ADSB mode  error: " << err << endl;
+			std::cout << "ADSB mode  error: " << err << endl;
 
 		return err;
 	}
 	else
 	{
-		cout << "\nSet ADSB mode returned with: " << err << endl;
+		std::cout << "\nSet ADSB mode returned with: " << err << endl;
 		return sdrplay_api_InvalidParam;
 	}
 }
@@ -1267,13 +1269,13 @@ sdrplay_api_ErrT sdrplay_device::setRSPduoHiZ(int value)
 
 	if (err != sdrplay_api_Success)
 	{
-		cout << "***RSPduo HiZ control setting error: " << err << endl;
+		std::cout << "***RSPduo HiZ control setting error: " << err << endl;
 		return err;
 	}
 	else
 	{
 		_rspDuoHiZ = value == 1;
-		cout << "RSPduo HiZ control returned " << err << endl;
+		std::cout << "RSPduo HiZ control returned " << err << endl;
 	}
 	return err;
 }
@@ -1329,7 +1331,7 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 			{
 				if (basicMode)
 				{
-					cout << "Tuner B not possible in Basic mode." << endl;
+					std::cout << "Tuner B not possible in Basic mode." << endl;
 					err = sdrplay_api_InvalidParam;
 					break;
 				}
@@ -1357,16 +1359,126 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 			break;
 	}
 
-	cout << "\nAntenna control returned with: " << err << endl;
+	std::cout << "\nAntenna control returned with: " << err << endl;
 	if (err != sdrplay_api_Success)
 	{
-		cout << "Antenna control setting error: " << err << endl;
+		std::cout << "Antenna control setting error: " << err << endl;
 		return err;
 	}
 	else
 	{
-		cout <<" Setting Antenna #" << value << "succeeded" << endl;
+		std::cout <<" Setting Antenna #" << value << "succeeded" << endl;
 		Antenna = value;
+	}
+	return err;
+}
+
+// Low Word: Notch id
+// High Word: 0 disable, 1 enable
+//	enum eNotch
+//{
+//	NOTCH_NULL = 0
+//	, NOTCH_RF = 1
+//	, NOTCH_AM = 2
+//	, NOTCH_DAB = 3
+//};
+sdrplay_api_ErrT sdrplay_device::setNotch(int value)
+{
+ 
+	int endis = (value & 0xffff0000) != 0 ? 1 : 0;
+	eNotch notch = (eNotch)(value & 3);
+	if (notch == NOTCH_NULL)
+	{
+		std::cout << "notch value of " << notch << " not valid" << endl;
+		return sdrplay_api_InvalidParam;
+	}
+	char* chr_endis;
+	if (endis == 1) chr_endis = "enabled"; else if (endis == 0) chr_endis = "disabled"; else chr_endis = "invalid";
+	std::cout << "notch " << notch << " to be " << chr_endis << endl;
+	bool isDx = rxType == RSPdx;
+
+	switch (rxType)
+	{
+		case RSP1A:
+			// DAB notch or RF notch
+			if (notch == NOTCH_DAB)
+			{
+				deviceParams->devParams->rsp1aParams.rfDabNotchEnable = endis;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_Rsp1a_RfDabNotchControl, sdrplay_api_Update_Ext1_None);
+			}
+			else if (notch == NOTCH_RF)
+			{
+				deviceParams->devParams->rsp1aParams.rfNotchEnable = endis;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_Rsp1a_RfNotchControl, sdrplay_api_Update_Ext1_None);
+			}
+			else
+				err = sdrplay_api_InvalidParam;
+			break;
+
+		case RSP2:
+			// RF notch only
+			pCurCh->rsp2TunerParams.rfNotchEnable = endis;
+			if (notch == NOTCH_RF)
+			{
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_Rsp2_RfNotchControl, sdrplay_api_Update_Ext1_None);
+			}
+			else
+				err = sdrplay_api_InvalidParam;
+			break;
+
+		case RSPduo:
+			// DAB or RF or AM notch
+			if (notch == NOTCH_DAB)
+			{
+				pCurCh->rspDuoTunerParams.rfDabNotchEnable = endis;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_RspDuo_RfDabNotchControl, sdrplay_api_Update_Ext1_None);
+			}
+			else if (notch == NOTCH_RF)
+			{
+				pCurCh->rspDuoTunerParams.rfNotchEnable = endis;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_RspDuo_RfNotchControl, sdrplay_api_Update_Ext1_None);
+			}
+			else if (notch == NOTCH_AM)
+			{
+				pCurCh->rspDuoTunerParams.tuner1AmNotchEnable = endis;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_RspDuo_Tuner1AmNotchControl, sdrplay_api_Update_Ext1_None);
+			}
+			else
+				err = sdrplay_api_InvalidParam;
+
+			break;
+
+		case RSPdx:
+			// DAB or RF notch
+			if (notch == NOTCH_DAB)
+			{
+				deviceParams->devParams->rspDxParams.rfDabNotchEnable = endis;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_RfDabNotchControl);
+			}
+			else if (notch == NOTCH_RF)
+			{
+				deviceParams->devParams->rspDxParams.rfNotchEnable = endis;
+				err = sdrplay_api_Update(pDevice->dev, pDevice->tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_RfNotchControl);
+			}
+			else
+				err = sdrplay_api_InvalidParam;
+
+			break;
+
+		default:
+			err = sdrplay_api_InvalidParam;
+			break;
+	}
+
+	//std::cout << "\nNotch control returned with: " << err << endl;
+	if (err != sdrplay_api_Success)
+	{
+		std::cout << "Notch control setting error: " << err << endl;
+		return err;
+	}
+	else
+	{
+		std::cout <<" Setting Notch " << notch << " succeeded" << endl;
 	}
 	return err;
 }

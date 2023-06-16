@@ -49,7 +49,8 @@ using namespace std;
 // V0.3.6	Linux mode (QIRX only, with device selection)
 // V0.3.7   Commandline -B 1 for basic mode compatible with SDR# and DAB player
 // V0.3.8   Commandline -L <x> for LNA state 0 <= x <= 15
-string Version = "0.3.8";
+// V0.3.9   Notch filter for DAB, WFM, AM
+string Version = "0.3.9";
 
 bool exitRequest = false;
 pthread_mutex_t stateLock;
