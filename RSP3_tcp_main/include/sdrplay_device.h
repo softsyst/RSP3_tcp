@@ -313,6 +313,7 @@ private:
 
 	// currently commanded values
 	int currentFrequencyHz;
+	int _frequencyAfterCbkChange = 0;
 	int gainReduction;				// Calculated from the RequestedGain
 
 	bool _rspDuoHiZ = false;
@@ -329,6 +330,14 @@ public:
 	void setDevice(sdrplay_api_DeviceT* dev)
 	{
 		pDevice = dev;
+	}
+	void setFreqAfterCbkChange(int freq)
+	{
+		_frequencyAfterCbkChange = freq;
+	}
+	int getFreqAfterCbkChange()
+	{
+		return _frequencyAfterCbkChange;
 	}
 	//bool collectDevices();	// called from the controlThread, on clients request
 	int prepareSerialsList(BYTE* buf);
@@ -366,6 +375,10 @@ public:
 		overload_a = overloaded_A;
 		overload_b = overloaded_B;
 	}
+	int getAntenna() const;
+	bool getDabNotch() const;
+	bool getRfNotch() const;
+	bool getAmNotch() const;
 
 };
 
