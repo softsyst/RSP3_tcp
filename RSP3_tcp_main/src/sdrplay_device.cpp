@@ -652,6 +652,13 @@ void streamCallback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
 
 	try
 	{
+		if (params->rfChanged)
+		{
+			int fChgd = md->pCurCh->tunerParams.rfFreq.rfHz;
+			md->setFreqAfterCbkChange(fChgd);
+			std::cout << "Rf (Hz) changed to " << fChgd << endl;
+
+		}
 		//In case of a socket error, don't process the data for one second
 		if (md->cbksPerSecond-- > 0)
 		{
@@ -1372,6 +1379,55 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 	}
 	return err;
 }
+int sdrplay_device::getAntenna() const
+{
+	bool isDx = rxType == RSPdx;
+	sdrplay_api_ErrT err = sdrplay_api_Success;
+	int value = 0;
+	t_freqBand band = Band_Invalid;
+
+	switch (rxType)
+	{
+		case RSP1A:
+			err = sdrplay_api_InvalidParam;
+			break;
+		case RSP2:
+			band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode);
+			// Antenna A or Antenna B
+			// HiZ, value should be 1
+			if (band == Band_0_60MHz)
+			{
+				value = pCurCh->rsp2TunerParams.amPortSel;
+			}
+			value |= pCurCh->rsp2TunerParams.antennaSel;
+			break;
+
+		case RSPduo:
+			err = sdrplay_api_InvalidParam;
+			break;
+		case RSPdx:
+			// Antenna A or Antenna B or Antenna C
+			if (value >= 0 && value <= 2 )
+			{
+				value = deviceParams->devParams->rspDxParams.antennaSel;
+			}
+			break;
+
+		default:
+			err = sdrplay_api_InvalidParam;
+			break;
+	}
+
+	if (err != sdrplay_api_Success && (rxType == RSP2 || rxType == RSPdx))
+	{
+		std::cout << "Antenna control retrieve error: " << err << endl;
+	}
+	else
+	{
+		//std::cout << "\nAntenna control returned with: " << value << endl;
+	}
+	return value;
+}
 
 // Low Word: Notch id
 // High Word: 0 disable, 1 enable
@@ -1481,6 +1537,96 @@ sdrplay_api_ErrT sdrplay_device::setNotch(int value)
 		std::cout <<" Setting Notch " << notch << " succeeded" << endl;
 	}
 	return err;
+}
+
+bool sdrplay_device::getDabNotch() const
+{
+	sdrplay_api_ErrT err = sdrplay_api_Success;
+	int value = 0;
+
+	bool isDx = rxType == RSPdx;
+
+	switch (rxType)
+	{
+		case RSP1A:
+			// DAB notch or RF notch
+			value = deviceParams->devParams->rsp1aParams.rfDabNotchEnable;
+			break;
+
+		case RSP2:
+			err = sdrplay_api_InvalidParam;
+			break;
+
+		case RSPduo:
+			// DAB or RF or AM notch
+			value = pCurCh->rspDuoTunerParams.rfDabNotchEnable;
+			break;
+
+		case RSPdx:
+			value = deviceParams->devParams->rspDxParams.rfDabNotchEnable;
+			break;
+
+		default:
+			err = sdrplay_api_InvalidParam;
+			break;
+	}
+
+	if (err != sdrplay_api_Success)
+	{
+		std::cout << "DAB Notch control getting error: " << err << endl;
+		return false;
+	}
+	//else
+	//{
+	//	std::cout <<" Getting DAB Notch succeeded" << endl;
+	//}
+	return (bool)value;
+}
+
+bool sdrplay_device::getRfNotch() const
+{
+	sdrplay_api_ErrT err = sdrplay_api_Success;
+	int value = 0;
+
+	bool isDx = rxType == RSPdx;
+
+	switch (rxType)
+	{
+		case RSP1A:
+			// RF notch
+			value = deviceParams->devParams->rsp1aParams.rfNotchEnable;
+			break;
+
+		case RSP2:
+			// RF notch only
+			value = pCurCh->rsp2TunerParams.rfNotchEnable;
+			break;
+
+		case RSPduo:
+			// DAB or RF or AM notch
+			value = pCurCh->rspDuoTunerParams.rfNotchEnable;
+			break;
+
+		case RSPdx:
+			value = deviceParams->devParams->rspDxParams.rfNotchEnable;
+			break;
+
+		default:
+			err = sdrplay_api_InvalidParam;
+			break;
+	}
+
+	//std::cout << "\nNotch control returned with: " << err << endl;
+	if (err != sdrplay_api_Success)
+	{
+		std::cout << "Rf Notch control getting error: " << err << endl;
+		return false;
+	}
+	//else
+	//{
+	//	std::cout <<" Getting Rf Notch succeeded" << endl;
+	//}
+	return (bool)value;
 }
 
 

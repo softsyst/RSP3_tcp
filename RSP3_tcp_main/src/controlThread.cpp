@@ -61,6 +61,13 @@ enum eIndications
 	, IND_DEVICE_RELEASED	= 0x88            // 1 byte bool
 	, IND_RSPDUO_HiZ    	= 0x89            // 1 byte bool
 	, IND_BIAST_STATE       = 0x8A			  // 0: off, 1: on
+	, IND_RF_CHANGED        = 0x8B			  // 4 Byte current frequency
+	, IND_AM_NOTCH          = 0x8C			  // 1 byte ->0: off, 1: on
+	, IND_DAB_NOTCH         = 0x8D			  // 1 byte ->0: off, 1: on
+	, IND_RF_NOTCH          = 0x8E			  // 1 byte ->0: off, 1: on
+	, IND_ANTENNA_SELECTED  = 0x8F			  // 1 byte -> 5,6: RSPII or RSPduo TunerSelect
+											  //           0,1,2: RSPdx A, B, C
+											  // 7 && 0-60MHz : HiZ
 };
 
 #ifdef _WIN32
@@ -260,6 +267,12 @@ void *ctrl_thread_fn(void *arg)
 			bool overload_a = false, overload_b = false;
 			bool rspDuoHiZ = false;
 			int buflen = 0;
+			int frequencyFromCallback = 0;
+
+			int antennaValue = 0;
+			bool dabNotch = false;
+			bool rfNotch = false;
+			bool amNotch = false;
 
 			pthread_mutex_lock(&stateLock);
 
@@ -320,6 +333,20 @@ void *ctrl_thread_fn(void *arg)
 				rspDuoHiZ = dev->getRspDuoHiZ();
 				len = prepareIntCommand(txbuf, len, IND_RSPDUO_HiZ, rspDuoHiZ ? 1 : 0, 1);
 			
+				frequencyFromCallback = (uint32_t)dev->getFreqAfterCbkChange();
+				len = prepareIntCommand(txbuf, len, IND_RF_CHANGED, frequencyFromCallback, 4);
+			
+				antennaValue = dev->getAntenna();
+				len = prepareIntCommand(txbuf, len, IND_ANTENNA_SELECTED, antennaValue, 1);
+			
+				dabNotch = dev->getDabNotch();
+				len = prepareIntCommand(txbuf, len, IND_DAB_NOTCH, dabNotch ? 1 : 0, 1);
+			
+				rfNotch = dev->getRfNotch();
+				len = prepareIntCommand(txbuf, len, IND_RF_NOTCH, rfNotch ? 1 : 0, 1);
+
+				//amNotch = dev->getAmNotch();
+				//len = prepareIntCommand(txbuf, len, IND_AM_NOTCH, amNotch ? 1 : 0, 1);
 				break;
 			default:
 				goto sleep;
