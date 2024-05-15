@@ -1,5 +1,5 @@
 /**
-** RSP_tcp - TCP/IP I/Q Data Server for the sdrplay RSP2
+** RSP3_tcp - TCP/IP I/Q Data Server for the sdrplay RSP devices
 ** Copyright (C) 2017 Clem Schmidt, softsyst GmbH, http://www.softsyst.com
 **
 ** This program is free software; you can redistribute it and/or modify
@@ -318,6 +318,8 @@ private:
 
 	bool _rspDuoHiZ = false;
 	bool _isAdsbMode = false;
+	bool _reportDabNotchControlError = true;
+	bool _reportRfNotchControlError = true;
 	
 	sdrplay_api_RxChannelParamsT* pCurCh;
 
@@ -376,8 +378,8 @@ public:
 		overload_b = overloaded_B;
 	}
 	int getAntenna() const;
-	bool getDabNotch() const;
-	bool getRfNotch() const;
+	bool getDabNotch() /*const*/;
+	bool getRfNotch() /*const*/;
 	bool getAmNotch() const;
 
 };

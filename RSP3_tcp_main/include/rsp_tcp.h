@@ -40,6 +40,8 @@ enum eRxType
 	RSP2,
 	RSPduo,
 	RSPdx,
+	RSP1B,
+	RSPdxR2,
 	UNKNOWN
 	//RSP1 = 6,
 	//RSP1A = 7,
