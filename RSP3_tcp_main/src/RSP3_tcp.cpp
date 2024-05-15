@@ -51,7 +51,8 @@ using namespace std;
 // V0.3.8   Commandline -L <x> for LNA state 0 <= x <= 15
 // V0.3.9   Notch filter for DAB, WFM, AM
 // V0.3.10  Notch filter and antenna states sent back to host
-string Version = "0.3.10";
+// V0.3.11  sdrplay API 3.15
+string Version = "0.3.11";
 
 bool exitRequest = false;
 pthread_mutex_t stateLock;
@@ -64,6 +65,17 @@ map<eErrors, string> returnErrorStrings =
 	,{ E_NO_DEVICE, "No sdrplay device found."}
 	,{ E_DEVICE_INDEX, "Requested Device Index not present: "}
 	,{ E_WIN_WSA_STARTUP, "WSAStartup failed with error:  "}
+};
+
+map<int, string> deviceNameByType =
+{
+	 { SDRPLAY_RSP1_ID, "RSP1"}
+    ,{ SDRPLAY_RSP1A_ID, "RSP1A"}
+	,{ SDRPLAY_RSP2_ID, "RSP2"}
+	,{ SDRPLAY_RSPduo_ID, "RSPduo"}
+	,{ SDRPLAY_RSPdx_ID, "RSPdx"}
+	,{ SDRPLAY_RSP1B_ID, "RSP1B"}
+	,{ SDRPLAY_RSPdxR2_ID, "RSPdxR2"}
 };
 
 #ifdef _WIN32
@@ -185,7 +197,7 @@ int main(int argc, char* argv[])
 		
 	if ((apiVersion < SDRPLAY_API_VERSION -epsilon) || (apiVersion > SDRPLAY_API_VERSION + epsilon))
 	{
-		printf("*** Warning : API version don't match (local=%.2f dll=%.2f)\n", SDRPLAY_API_VERSION, apiVersion);
+		printf("*** Warning : API version doesn't match (local=%.2f dll=%.2f)\n", SDRPLAY_API_VERSION, apiVersion);
 		//retCode = E_WRONG_API_VERSION;
 		//sError = returnErrorStrings[retCode];
 		//goto exitapp;
@@ -198,8 +210,17 @@ int main(int argc, char* argv[])
 		for (int i=0; i < devices::instance().numDevices; i++)
 		{
 			sdrplay_api_DeviceT* pd = &devices::instance().sdrplayDevices[i];
+			int hwVer = (int)pd->hwVer;
+			if ((hwVer < SDRPLAY_RSP1_ID || hwVer > SDRPLAY_RSPdxR2_ID) &&
+				hwVer != SDRPLAY_RSP1A_ID)
+			{
+				cout << "\tUnknown Hardware version: " << hwVer << endl;
+				continue;
+			}
+
 			cout << "\tSerial: " << pd->SerNo << endl;
 			cout << "\tHardware Version: " << (int)pd->hwVer << endl;
+			cout << "\tHardware Type: " << deviceNameByType[hwVer] << endl;
 			cout << "\n";
 		}
 		devices::instance().Start(pargs);

@@ -212,6 +212,10 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 		rxType = RSPduo;
 	else if (pd->hwVer == SDRPLAY_RSPdx_ID)
 		rxType = RSPdx;
+	else if (pd->hwVer == SDRPLAY_RSPdxR2_ID)
+		rxType = RSPdxR2;
+	else if (pd->hwVer == SDRPLAY_RSP1B_ID)
+		rxType = RSP1B;
 	else
 		rxType = UNKNOWN;
 
@@ -1539,7 +1543,7 @@ sdrplay_api_ErrT sdrplay_device::setNotch(int value)
 	return err;
 }
 
-bool sdrplay_device::getDabNotch() const
+bool sdrplay_device::getDabNotch() /*const*/
 {
 	sdrplay_api_ErrT err = sdrplay_api_Success;
 	int value = 0;
@@ -1573,7 +1577,9 @@ bool sdrplay_device::getDabNotch() const
 
 	if (err != sdrplay_api_Success)
 	{
-		std::cout << "DAB Notch control getting error: " << err << endl;
+		if (_reportDabNotchControlError)
+			std::cout << "DAB Notch control getting error: " << err << endl;
+		_reportDabNotchControlError = false;
 		return false;
 	}
 	//else
@@ -1583,7 +1589,7 @@ bool sdrplay_device::getDabNotch() const
 	return (bool)value;
 }
 
-bool sdrplay_device::getRfNotch() const
+bool sdrplay_device::getRfNotch() /*const*/
 {
 	sdrplay_api_ErrT err = sdrplay_api_Success;
 	int value = 0;
@@ -1619,7 +1625,9 @@ bool sdrplay_device::getRfNotch() const
 	//std::cout << "\nNotch control returned with: " << err << endl;
 	if (err != sdrplay_api_Success)
 	{
-		std::cout << "Rf Notch control getting error: " << err << endl;
+		if (_reportRfNotchControlError)
+			std::cout << "Rf Notch control getting error: " << err << endl;
+		_reportRfNotchControlError = false;
 		return false;
 	}
 	//else

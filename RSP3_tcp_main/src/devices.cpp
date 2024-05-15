@@ -68,7 +68,7 @@ bool devices::collectDevices()
 			if (err != sdrplay_api_Success)
 				throw msg_exception(error.c_str());
 
-			if ((sdrplayDevices[i].hwVer < SDRPLAY_RSP1_ID || sdrplayDevices[i].hwVer > SDRPLAY_RSPdx_ID) &&
+			if ((sdrplayDevices[i].hwVer < SDRPLAY_RSP1_ID || sdrplayDevices[i].hwVer > SDRPLAY_RSPdxR2_ID) &&
 				sdrplayDevices[i].hwVer != SDRPLAY_RSP1A_ID)
 			{
 				printf("Unknown Hardware version %d .\n", sdrplayDevices[i].hwVer);
