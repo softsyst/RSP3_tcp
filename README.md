@@ -7,6 +7,8 @@ TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver 
 ## History
 ### V0.3.13, June 2024
 - Hardware RSP1B and RSPdxR2 tested (on Windows 10)
+- **Credits:**
+  Thanks to **Bernhard (DB9PP)** and **Alex** aka DABär (in rundfunkforum.de), for their tests on the hardware.
 ### V0.3.11, May 2024
 - Working with sdrplay driver 3.15.
 - Device ranges adapted according to the new RSP1B, RSPdxR2
