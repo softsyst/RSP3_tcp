@@ -52,7 +52,9 @@ using namespace std;
 // V0.3.9   Notch filter for DAB, WFM, AM
 // V0.3.10  Notch filter and antenna states sent back to host
 // V0.3.11  sdrplay API 3.15
-string Version = "0.3.11";
+// V0.3.12  Corrections for RSP1B, RSPdxR2
+// V0.3.13  RSPdxR2 tested
+string Version = "0.3.13";
 
 bool exitRequest = false;
 pthread_mutex_t stateLock;
@@ -162,6 +164,7 @@ int main(int argc, char* argv[])
 	pthread_mutex_init(&stateLock, NULL);
 
 	gainConfiguration::createGainConfigTables();
+	gainConfiguration::createGainConfigTable_RSP1B();
 
 	// Open API
 	if ((err = sdrplay_api_Open()) == sdrplay_api_Success)
@@ -211,6 +214,10 @@ int main(int argc, char* argv[])
 		{
 			sdrplay_api_DeviceT* pd = &devices::instance().sdrplayDevices[i];
 			int hwVer = (int)pd->hwVer;
+			//!! test uncomment next two lines
+			//if (hwVer == 4)
+			//	hwVer = 7;
+			//!! test end
 			if ((hwVer < SDRPLAY_RSP1_ID || hwVer > SDRPLAY_RSPdxR2_ID) &&
 				hwVer != SDRPLAY_RSP1A_ID)
 			{
@@ -219,7 +226,8 @@ int main(int argc, char* argv[])
 			}
 
 			cout << "\tSerial: " << pd->SerNo << endl;
-			cout << "\tHardware Version: " << (int)pd->hwVer << endl;
+			cout << "\tHardware Version: " << (int)hwVer << endl;
+			//cout << "\tHardware Version: " << (int)pd->hwVer << endl;
 			cout << "\tHardware Type: " << deviceNameByType[hwVer] << endl;
 			cout << "\n";
 		}

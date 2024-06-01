@@ -102,7 +102,13 @@ int sdrplay_device::prepareSerialsList(BYTE* buf)
 		for (int k = 0; k < SERLEN; k++)
 			*p++ = sdrplayDevices[i].SerNo[k];
 		*p++ = ',';
-		*p++ = sdrplayDevices[i].hwVer;
+		// test
+		BYTE hwver = sdrplayDevices[i].hwVer;
+		// ##!!test: uncomment next two lines
+		//if (hwver == SDRPLAY_RSPdx_ID)
+		//	hwver = SDRPLAY_RSPdxR2_ID;
+		// ##!! test end
+		* p++ = hwver;
 		*p++ = ';';
 	}
 	int len = int(p - buf);
@@ -211,8 +217,10 @@ sdrplay_api_ErrT  sdrplay_device::selectDevice(uint32_t crc)
 	else if (pd->hwVer == SDRPLAY_RSPduo_ID)
 		rxType = RSPduo;
 	else if (pd->hwVer == SDRPLAY_RSPdx_ID)
+		//!! test: comment next two lines
 		rxType = RSPdx;
 	else if (pd->hwVer == SDRPLAY_RSPdxR2_ID)
+		//!! test end
 		rxType = RSPdxR2;
 	else if (pd->hwVer == SDRPLAY_RSP1B_ID)
 		rxType = RSP1B;
@@ -373,7 +381,7 @@ void sdrplay_device::writeWelcomeString() const
 	memset(buf, 0, c_welcomeMessageLength);
 	memcpy(buf, buf0, 4);
 	buf[6] = bitWidth;
-	buf[7] = BYTE(rxType+7);	//7:RSP1, 8: RSP1A, 9: RSP2, 10:RSPduo
+	buf[7] = BYTE(rxType+7);	//7:RSP1, 8: RSP1A, 9: RSP2, 10:RSPduo, 11: RSPdx, 12:RSP1B, 13:RSPdxR2
 	buf[11] = 0;// gainConfiguration::GAIN_STEPS;
 	buf[15] = 0x52; buf[16] = 0x53; buf[17] = 0x50; buf[18] = (BYTE)(rxType + 0x30); //"RSP2", interpreted e.g. by qirx
 	send(remoteClient, (const char*)buf, c_welcomeMessageLength, 0);
@@ -975,37 +983,65 @@ sdrplay_api_ErrT sdrplay_device::setAGC(bool on)
 
 sdrplay_api_ErrT sdrplay_device::setLNAState(int value)
 {
-	bool isDx = rxType == RSPdx;
+	bool isDx = (rxType == RSPdx || rxType  == RSPdxR2);
 
-	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode );
-	if (band == Band_Invalid)
-		return sdrplay_api_OutOfRange;
+	//gainConfiguration* pGainCfg = 0;
+	int lnaStates = 0;
 
-	gainConfiguration gcfg(band);
-
-	int lnaStates = gcfg.LNAstates[rxType][band];
-
-	if (value < 0 || value >= lnaStates)
+	if (rxType != RSP1B)
 	{
-		std::cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " available." << endl;
-		return sdrplay_api_OutOfRange;
-	}
-	if ( gcfg.IsGrInvalid(rxType, value, band))
-	{
-		std::cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " is invalid." << endl;
-		return sdrplay_api_OutOfRange;
-	}
+		int rx_type = rxType;
+		if (rxType == RSPdxR2)
+			rx_type = RSPdx;
 
-	int lnastate = pCurCh->tunerParams.gain.LNAstate;
-	if (value == lnastate)
-		return sdrplay_api_Success;
+		t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode);
+		if (band == Band_Invalid)
+			return sdrplay_api_InvalidParam;
+
+		gainConfiguration gcfg(band);
+	    lnaStates = gcfg.LNAstates[rx_type][band];
+
+		if (value < 0 || value >= lnaStates)
+		{
+			std::cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " available." << endl;
+			return sdrplay_api_OutOfRange;
+		}
+		if ( gcfg.IsGrInvalid(rx_type, value, band))
+		{
+			std::cout << "***Error in setLNAState. state #" << value << " requested, but "<< lnaStates << " is invalid." << endl;
+			return sdrplay_api_OutOfRange;
+		}
+	}
+	else
+	{
+		t_freqBand_RSP1B band = gainConfiguration::BandIndexFromHz_RSP1B(currentFrequencyHz);
+		if (band == RSP1B_Band_Invalid)
+			return sdrplay_api_InvalidParam;
+
+		gainConfiguration gcfg(band);
+		lnaStates = gcfg.LNAstates_RSP1B[band];
+
+		if (value < 0 || value >= lnaStates)
+		{
+			std::cout << "***Error in setLNAState. state #" << value << " requested, but " << lnaStates << " available." << endl;
+			return sdrplay_api_OutOfRange;
+		}
+		if (gcfg.IsGrInvalid_RSP1B(value, band))
+		{
+			std::cout << "***Error in setLNAState. state #" << value << " requested, but " << lnaStates << " is invalid." << endl;
+			return sdrplay_api_OutOfRange;
+		}
+	}
 
 	pCurCh->tunerParams.gain.LNAstate = (BYTE)value;
 	sdrplay_api_ErrT err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 		sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-	lnastate = pCurCh->tunerParams.gain.LNAstate;
-
+	int lnastate = pCurCh->tunerParams.gain.LNAstate;
 	std::cout << "New lnastate returned with " << err << " and new lnastate " << lnastate << endl;
+
+	if (value == lnastate)
+		return sdrplay_api_Success;
+
 	return err;
 }
 
@@ -1019,6 +1055,7 @@ bool sdrplay_device::getBiasTState()
 		switch (rxType)
 		{
 		case RSP1A:
+		case RSP1B:
 			val = pCurCh->rsp1aTunerParams.biasTEnable;
 			break;
 		case RSP2:
@@ -1028,6 +1065,7 @@ bool sdrplay_device::getBiasTState()
 			val = pCurCh->rspDuoTunerParams.biasTEnable;
 			break;
 		case RSPdx:
+		case RSPdxR2:
 			val = deviceParams->devParams->rspDxParams.biasTEnable;
 			break;
 		default:
@@ -1191,6 +1229,7 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 	switch (rxType)
 	{
 		case RSP1A:
+		case RSP1B:
 			pCurCh->rsp1aTunerParams.biasTEnable = (BYTE)value;
 			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_Rsp1a_BiasTControl, sdrplay_api_Update_Ext1_None);
@@ -1206,6 +1245,7 @@ sdrplay_api_ErrT sdrplay_device::setBiasT(int value)
 				sdrplay_api_Update_RspDuo_BiasTControl, sdrplay_api_Update_Ext1_None);
 			break;
 		case RSPdx:
+		case RSPdxR2:
 			deviceParams->devParams->rspDxParams.biasTEnable = (BYTE)value;
 			err = sdrplay_api_Update(pDevice->dev, pDevice->tuner,
 				sdrplay_api_Update_None, sdrplay_api_Update_RspDx_BiasTControl);
@@ -1292,13 +1332,14 @@ sdrplay_api_ErrT sdrplay_device::setRSPduoHiZ(int value)
 }
 sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 {
-	bool isDx = rxType == RSPdx;
+	bool isDx = (rxType == RSPdx || rxType == RSPdxR2);
 
 	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode);
 
 	switch (rxType)
 	{
 		case RSP1A:
+		case RSP1B:
 			err = sdrplay_api_InvalidParam;
 			break;
 		case RSP2:
@@ -1355,6 +1396,7 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 			}
 			break;
 		case RSPdx:
+		case RSPdxR2:
 			// Antenna A or Antenna B or Antenna C
 			if (value >= 0 && value <= 2 )
 			{
@@ -1385,14 +1427,15 @@ sdrplay_api_ErrT sdrplay_device::setAntenna(int value)
 }
 int sdrplay_device::getAntenna() const
 {
-	bool isDx = rxType == RSPdx;
 	sdrplay_api_ErrT err = sdrplay_api_Success;
 	int value = 0;
 	t_freqBand band = Band_Invalid;
+	bool isDx = (rxType == RSPdx || rxType == RSPdxR2);
 
 	switch (rxType)
 	{
 		case RSP1A:
+		case RSP1B:
 			err = sdrplay_api_InvalidParam;
 			break;
 		case RSP2:
@@ -1410,6 +1453,7 @@ int sdrplay_device::getAntenna() const
 			err = sdrplay_api_InvalidParam;
 			break;
 		case RSPdx:
+		case RSPdxR2:
 			// Antenna A or Antenna B or Antenna C
 			if (value >= 0 && value <= 2 )
 			{
@@ -1422,7 +1466,7 @@ int sdrplay_device::getAntenna() const
 			break;
 	}
 
-	if (err != sdrplay_api_Success && (rxType == RSP2 || rxType == RSPdx))
+	if (err != sdrplay_api_Success && (rxType == RSP2 || rxType == RSPdx || rxType == RSPdxR2))
 	{
 		std::cout << "Antenna control retrieve error: " << err << endl;
 	}
@@ -1455,11 +1499,11 @@ sdrplay_api_ErrT sdrplay_device::setNotch(int value)
 	char* chr_endis;
 	if (endis == 1) chr_endis = "enabled"; else if (endis == 0) chr_endis = "disabled"; else chr_endis = "invalid";
 	std::cout << "notch " << notch << " to be " << chr_endis << endl;
-	bool isDx = rxType == RSPdx;
 
 	switch (rxType)
 	{
 		case RSP1A:
+		case RSP1B:
 			// DAB notch or RF notch
 			if (notch == NOTCH_DAB)
 			{
@@ -1509,6 +1553,7 @@ sdrplay_api_ErrT sdrplay_device::setNotch(int value)
 			break;
 
 		case RSPdx:
+		case RSPdxR2:
 			// DAB or RF notch
 			if (notch == NOTCH_DAB)
 			{
@@ -1548,11 +1593,10 @@ bool sdrplay_device::getDabNotch() /*const*/
 	sdrplay_api_ErrT err = sdrplay_api_Success;
 	int value = 0;
 
-	bool isDx = rxType == RSPdx;
-
 	switch (rxType)
 	{
 		case RSP1A:
+		case RSP1B:
 			// DAB notch or RF notch
 			value = deviceParams->devParams->rsp1aParams.rfDabNotchEnable;
 			break;
@@ -1567,6 +1611,7 @@ bool sdrplay_device::getDabNotch() /*const*/
 			break;
 
 		case RSPdx:
+		case RSPdxR2:
 			value = deviceParams->devParams->rspDxParams.rfDabNotchEnable;
 			break;
 
@@ -1594,11 +1639,10 @@ bool sdrplay_device::getRfNotch() /*const*/
 	sdrplay_api_ErrT err = sdrplay_api_Success;
 	int value = 0;
 
-	bool isDx = rxType == RSPdx;
-
 	switch (rxType)
 	{
 		case RSP1A:
+		case RSP1B:
 			// RF notch
 			value = deviceParams->devParams->rsp1aParams.rfNotchEnable;
 			break;
@@ -1614,6 +1658,7 @@ bool sdrplay_device::getRfNotch() /*const*/
 			break;
 
 		case RSPdx:
+		case RSPdxR2:
 			value = deviceParams->devParams->rspDxParams.rfNotchEnable;
 			break;
 
@@ -1643,19 +1688,40 @@ bool sdrplay_device::RSPGainValuesFromRequestedGain(int flatValue, int rxtype, i
 	if (flatGr)
 		return false;
 
-	bool isDx = rxType == RSPdx;
-	t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode);
-	if (band == Band_Invalid)
-		return false;
-
-
-	gainConfiguration gcfg(band);
-
-	if (gcfg.calculateGrValues(flatValue, rxType, LNAstate, gr))
+	if (rxType != RSP1B)
 	{
-		return true;
+		int rx_type = rxtype;
+		bool isDx = (rxtype == RSPdx || rxtype == RSPdxR2);
+		if (rxtype == RSPdxR2)
+			rx_type = RSPdx;
+		t_freqBand band = gainConfiguration::BandIndexFromHz(currentFrequencyHz, isDx, dxHDRmode);
+		if (band == Band_Invalid)
+			return false;
+
+
+		gainConfiguration gcfg(band);
+
+		if (gcfg.calculateGrValues(flatValue, rx_type, LNAstate, gr))
+		{
+			return true;
+		}
+		return false;
 	}
-	return false;
+	else //RSP1B
+	{
+		t_freqBand_RSP1B band = gainConfiguration::BandIndexFromHz_RSP1B(currentFrequencyHz);
+		if (band == RSP1B_Band_Invalid)
+			return false;
+
+
+		gainConfiguration gcfg(band);
+
+		if (gcfg.calculateGrValues(flatValue, rxtype, LNAstate, gr))
+		{
+			return true;
+		}
+		return false;
+	}
 }
 
 

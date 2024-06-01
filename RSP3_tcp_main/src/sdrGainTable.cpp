@@ -29,8 +29,81 @@ const static int grInvalid = 999;
 // 1st dim: Band, 2nd dim gr value for LNAstate
 matrix<int> gainTables[5]; // for each device one gain table
 
+// 1st dim: Band, 2nd dim gr value for LNAstate
+matrix<int> gainTable_RSP1B; // one gain table for the RSP1B
+
 //int noOfLNAStatesForDevice[4] =  {4, 10, 9, 10};
 
+void gainConfiguration::createGainConfigTable_RSP1B()
+{
+		// LNAstates, bands, init value
+		// RSP1B
+		gainTable_RSP1B.setSize(MAX_LNA_STATES, internalBands_RSP1B, 999); // linux grInvalid undefined reference???
+
+		// *********** RSP1B **************
+		//LNAstate 0
+		for (int k = 0; k < 5; k++)
+			gainTable_RSP1B[0][k] = 0;
+
+		//LNAstate 1
+		for (int k = 0; k < 5; k++)
+			gainTable_RSP1B[1][k] = 6;
+		gainTable_RSP1B[1][3] = 7;
+
+		//LNAstate 2
+		for (int k = 0; k < 5; k++)
+			gainTable_RSP1B[2][k] = 12;
+		gainTable_RSP1B[2][3] = 13;
+
+		//LNAstate 3
+		for (int k = 0; k < 3; k++)
+			gainTable_RSP1B[3][k] = 18;
+		gainTable_RSP1B[3][3] = 19;
+		gainTable_RSP1B[3][4] = 20;
+
+		//LNAstate 4
+		for (int k = 1; k < 4; k++)
+			gainTable_RSP1B[4][k] = 20;
+		gainTable_RSP1B[4][0] = 37;
+		gainTable_RSP1B[4][4] = 26;
+
+		//LNAstate 5
+		for (int k = 1; k < 3; k++)
+			gainTable_RSP1B[5][k] = 26;
+		gainTable_RSP1B[5][0] = 42;
+		gainTable_RSP1B[5][3] = 27;
+		gainTable_RSP1B[5][4] = 32;
+
+		//LNAstate 6
+		for (int k = 1; k < 3; k++)
+			gainTable_RSP1B[6][k] = 32;
+		gainTable_RSP1B[6][0] = 61;
+		gainTable_RSP1B[6][3] = 33;
+		gainTable_RSP1B[6][4] = 38;
+
+		//LNAstate 7
+		for (int k = 1; k < 3; k++)
+			gainTable_RSP1B[7][k] = 38;
+		gainTable_RSP1B[7][0] = grInvalid;
+		gainTable_RSP1B[7][3] = 39;
+		gainTable_RSP1B[7][4] = 43;
+
+		//LNAstate 8
+		for (int k = 1; k < 3; k++)
+			gainTable_RSP1B[8][k] = 57;
+		gainTable_RSP1B[8][0] = grInvalid;
+		gainTable_RSP1B[8][3] = 45;
+		gainTable_RSP1B[8][4] = 62;
+
+		//LNAstate 9
+		for (int k = 1; k < 3; k++)
+			gainTable_RSP1B[9][k] = 62;
+		gainTable_RSP1B[9][0] = grInvalid;
+		gainTable_RSP1B[9][3] = 64;
+		gainTable_RSP1B[9][4] = grInvalid;
+}
+
+// All devices except RSP1B
 void gainConfiguration::createGainConfigTables()
 {
 		// LNAstates, bands, init value
@@ -537,7 +610,26 @@ void gainConfiguration::createGainConfigTables()
 	 }
  }
 
+ t_freqBand_RSP1B gainConfiguration::BandIndexFromHz_RSP1B(long freqHz) 
+ {
+		if (freqHz >= 0 && freqHz < 50000000)
+			return RSP1B_Band_0_50MHz;
+		if (freqHz >= 50000000 && freqHz < 60000000)
+			return RSP1B_Band_50_60MHz;
+		else if (freqHz >= 60000000 && freqHz < 420000000)
+			return RSP1B_Band_60_420MHz;
+		else if (freqHz >= 420000000 && freqHz < 1000000000)
+			return RSP1B_Band_420_1000MHz;
+		else if (freqHz >= 1000000000 && freqHz < 2000000000)
+			return RSP1B_Band_1000_2000MHz;
+		else
+			return RSP1B_Band_Invalid;
+ }
+
  gainConfiguration::gainConfiguration(t_freqBand band) : myBand((int)band)
+ {
+ }
+ gainConfiguration::gainConfiguration(t_freqBand_RSP1B band) : myBand_RSP1B((int)band)
  {
  }
 
@@ -546,6 +638,10 @@ void gainConfiguration::createGainConfigTables()
 	 return gainTables[rxType][lnastate][band] == grInvalid;
  }
 
+ bool gainConfiguration::IsGrInvalid_RSP1B(int lnastate, int band)
+ {
+	 return gainTable_RSP1B[lnastate][band] == grInvalid;
+ }
 
 bool gainConfiguration::calculateGrValues(int flatValue, int rxtype, int& LNAstate, int& gr)
 {
@@ -563,20 +659,33 @@ bool gainConfiguration::calculateGrValues(int flatValue, int rxtype, int& LNAsta
 		gr = flatGr;
 		return true;
 	}
+	int band;
+	int lnaStates;
+	matrix<int> gainTable;
+
+	if (rxtype != RSP1B)
+	{
+		gainTable = gainTables[rxtype];
+		band = myBand;
+		lnaStates = LNAstates[rxtype][band];
+	}
+	else	//RSP1B
+	{
+		gainTable = gainTable_RSP1B;
+		band = myBand_RSP1B;
+		lnaStates = LNAstates_RSP1B[band];
+	}
 
 	try
 	{
-		matrix<int> gainTable = gainTables[rxtype];
-
 		//search for a reasonable combination of gr and LNAstate
-		int lnaStates = LNAstates[rxtype][myBand];
 
 		//search the lnastates table from 0 until the first value in range is found
 		//Take it as the gr corresponding to the lnastate
 		//for (int i = 0; i < lnaStates; i++)
-		for (int i = lnaStates-1; i >= 0; i--)
+		for (int i = lnaStates - 1; i >= 0; i--)
 		{
-			int val = gainTable[i][myBand];
+			int val = gainTable[i][band];
 			gr = flatGr - val;
 			if (gr >= 20 && gr < 60)
 			{
@@ -589,7 +698,7 @@ bool gainConfiguration::calculateGrValues(int flatValue, int rxtype, int& LNAsta
 	}
 	catch (const std::exception&)
 	{
-			
+
 	}
 	return false;
 }
