@@ -1,10 +1,12 @@
 # RSP3_tcp
-TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver V3 : RSP1A, RSP2, RSPduo (currently single tuner), RSPdx.
+TCP/IP Server for I/Q data delivered by sdrplay RSP devices, using their driver V3 : RSP1A, RSP1B, RSP2, RSPduo (currently single tuner), RSPdx, RSPdxR2.
 - Runs on Windows and Linux,
 - Delivers 8- and 16- Bit I/Q Data,
 - Working with sdrplay driver 3.15 (Linux still 3.07).
 - Developed as a server for QIRX V3 and V4, and with reduced functionality for other apps like SDR# (Source RTL-SDR TCP) or DAB Player (commandline -RtlTcp)
 ## History
+### V0.3.13, June 2024
+- Hardware RSP1B and RSPdxR2 tested (on Windows 10)
 ### V0.3.11, May 2024
 - Working with sdrplay driver 3.15.
 - Device ranges adapted according to the new RSP1B, RSPdxR2
