@@ -97,6 +97,7 @@ void* receive(void* p)
 				{
 					if (md == 0 || md->pDevice == 0 || md->pDevice->dev == 0)
 					{
+						std::cout << "Rx Socket Error : " << GETSOCKETERRNO() << endl;
 						throw msg_exception("No device present for Uninit on Socket rx error");
 					}
 					else

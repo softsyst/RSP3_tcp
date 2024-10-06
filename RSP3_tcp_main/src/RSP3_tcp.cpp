@@ -54,7 +54,7 @@ using namespace std;
 // V0.3.11  sdrplay API 3.15
 // V0.3.12  Corrections for RSP1B, RSPdxR2
 // V0.3.13  RSPdxR2 tested
-string Version = "0.3.13";
+string Version = "0.3.13a";
 
 bool exitRequest = false;
 pthread_mutex_t stateLock;

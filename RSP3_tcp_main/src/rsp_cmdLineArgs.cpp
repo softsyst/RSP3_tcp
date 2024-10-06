@@ -169,7 +169,7 @@ int rsp_cmdLineArgs::parse()
 			BasicMode = basicMode == 0? false: true;
 			break;
 		case 'L':
-			lnaState = intValue(it->second, "Invalid IP Address ", 0, 15);
+			lnaState = intValue(it->second, "Invalid LNA State ", 0, 15);
 			if (lnaState == 0)
 				goto exit;
 			LNAstate = lnaState;
