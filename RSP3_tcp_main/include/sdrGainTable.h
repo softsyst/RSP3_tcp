@@ -37,21 +37,35 @@
 		Band_60_250MHz,         // 8
 		Band_250_420MHz,		// 9
 		Band_420_1000dxMHz,		// 10
-		Band_1000_2000dxMHz,		// 11
+		Band_1000_2000dxMHz,	// 11
 		Band_Invalid
 	}
 	t_freqBand;
 
+	typedef enum
+	{
+		RSP1B_Band_0_50MHz = 0,
+		RSP1B_Band_50_60MHz,
+		RSP1B_Band_60_420MHz,
+		RSP1B_Band_420_1000MHz,
+		RSP1B_Band_1000_2000MHz,
+		RSP1B_Band_Invalid
+	}
+	t_freqBand_RSP1B;
 
 struct gainConfiguration
 {
 	static void createGainConfigTables();
+	static void createGainConfigTable_RSP1B();
 	static t_freqBand /*gainConfiguration::*/BandIndexFromHz(long freqHz, bool isRSPdx, bool isHDRmode);
+	static t_freqBand_RSP1B /*gainConfiguration::*/BandIndexFromHz_RSP1B(long freqHz);
 
 	const static int internalBands = 12; // 0..3 incl. RSPduo, 4...11 RSPdx
+	const static int internalBands_RSP1B = 5;
 	const static int minDxBandIx = 4;
 	const static int grInvalid = 999;
 	const static int MAX_LNA_STATES = 28;
+	const static int MAX_LNA_STATES_RSP1B = 10;
 	// get the band id of the matrix tables
 	// the AM(HiZ Port) is not covered
 
@@ -61,7 +75,12 @@ struct gainConfiguration
 		{7,10,10, 9, 0, 0, 0, 0, 0, 0, 0, 0},				// RSP1A
 		{9, 9, 6, 6, 0, 0, 0, 0, 0, 0, 0, 0},				// RSP2
 		{7,10,10, 9, 0, 0, 0, 0, 0, 0, 0, 0},				// RSPduo
-		{0, 0 ,0,  0, 22, 19, 20, 25, 27, 28, 21, 19}		// RSPdx
+		{0, 0 ,0,  0, 22, 19, 20, 25, 27, 28, 21, 19}		// RSPdx, RSPdxR2
+	};
+
+	const int LNAstates_RSP1B[internalBands_RSP1B] =    //number of LNAstates for the RSP1B's bands
+	{
+		7,10,10, 10, 9				// RSP1B
 	};
 
 	//Assumed gain steps for the RSP2
@@ -70,11 +89,14 @@ struct gainConfiguration
 
 	// the internally used band, converted from band
 	int myBand;
+	int myBand_RSP1B;
 
 	gainConfiguration(t_freqBand band);
+	gainConfiguration(t_freqBand_RSP1B band);
 
 	bool calculateGrValues(int flatValue, int rxtype, int& LNAstate, int& gr);
 	bool IsGrInvalid(int rxType, int lnastate, int band);
+	bool IsGrInvalid_RSP1B(int lnastate, int band);
 };
 
 
