@@ -31,6 +31,16 @@
     <ClInclude Include="include\sdrGainTable.h" />
     <ClInclude Include="include\sdrplay_device.h" />
     <ClInclude Include="include\syTwoDimArray.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_callback.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_control.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_dev.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_rsp1a.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_rsp2.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_rspDuo.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_rspDx.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_rx_channel.h" />
+    <ClInclude Include="include_sdrplay\sdrplay_api_tuner.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\common.cpp" />
